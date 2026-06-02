@@ -74,7 +74,7 @@ async function main() {
   const cmd = args[0];
 
   if (!cmd) {
-    await openChat();
+    console.log('Use splash run "prompt" instead.');
     return;
   }
 
@@ -92,7 +92,7 @@ async function main() {
       await runConfig(args.slice(1));
       return;
     case "chat":
-      await openChat();
+      console.log('Use splash run "prompt" instead.');
       return;
     case "telegram":
     case "slack":
@@ -632,7 +632,7 @@ async function launchTui(_focusId?: string): Promise<void> {
 
 async function runFromCli(prompt: string, opts: { background: boolean }): Promise<void> {
   if (!prompt.trim()) {
-    await openChat();
+    console.log('Use splash run "prompt" instead.');
     return;
   }
   ensureConfigured();
@@ -651,6 +651,14 @@ async function runFromCli(prompt: string, opts: { background: boolean }): Promis
 // ──────────────────────────────────────────────────────────────────────────
 // Self-Improvement Loop
 // ──────────────────────────────────────────────────────────────────────────
+
+function getOutput(res: any): string {
+  if (!res) return "Done";
+  if (res.ok) {
+    return res.value?.result?.output ? String(res.value.result.output) : "Done";
+  }
+  return res.error?.message || "Error";
+}
 
 async function runSelfImprove() {
   console.log(pc.magenta("\n🧠 SPLASH SELF-MODIFICATION ENGINE"));
@@ -689,11 +697,11 @@ Output ONLY a list of crisp, actionable rules you should adopt. Do not explain t
   const path = await import("node:path");
   const { globalConfigDir } = await import("@alpclaw/config");
   const learningsFile = path.join(globalConfigDir(), "learnings.md");
-  const learnings = `\n## Learnings (${new Date().toISOString()})\n${result.text}\n`;
+  const learnings = `\n## Learnings (${new Date().toISOString()})\n${getOutput(result)}\n`;
   fs.appendFileSync(learningsFile, learnings);
   
   console.log(pc.green(`✓ Success! New rules added to ${learningsFile}:\n`));
-  console.log(result.text);
+  console.log(getOutput(result));
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -706,8 +714,9 @@ async function runVoiceChat() {
   
   console.log(pc.yellow("Note: Live audio recording requires 'sox' to be installed on your system."));
   
-  let record;
+  let record: any;
   try {
+    // @ts-ignore
     record = await import("node-record-lpcm16");
   } catch (e) {
     console.error(pc.red("node-record-lpcm16 not installed."));
@@ -767,18 +776,18 @@ async function runSwarm(task: string) {
   const leaderPrompt = `You are the Swarm Leader. Aggregate these 3 reports into a final cohesive response for the user's task: "${task}".
   
 Report 1:
-${results[0].text}
+${getOutput(results[0])}
 
 Report 2:
-${results[1].text}
+${getOutput(results[1])}
 
 Report 3:
-${results[2].text}
+${getOutput(results[2])}
 `;
 
   const finalRes = await alpclaw.createAgent().run(leaderPrompt);
   console.log(pc.bold("\n👑 Leader Conclusion:\n"));
-  console.log(finalRes.text);
+  console.log(getOutput(finalRes));
 }
 
 // ──────────────────────────────────────────────────────────────────────────

@@ -125,7 +125,8 @@ async function main() {
           finishReason: "stop" as const,
         },
       }),
-      listModels: () => ["demo-v1"],
+      healthcheck: async () => true,
+      listModels: async () => [{ id: "demo-v1", isFree: true }],
     },
     {
       name: "demo",

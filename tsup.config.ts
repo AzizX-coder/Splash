@@ -19,6 +19,7 @@ export default defineConfig({
   ],
   external: [
     // Externalize all actual NPM node_modules
-    "dotenv", "ink", "react", "@clack/prompts", "marked", "marked-terminal", "telegraf"
+    "dotenv", "ink", "react", "@clack/prompts", "marked", "marked-terminal", "telegraf",
+    "jsdom", "@mozilla/readability", "turndown", "zod", "picocolors", "node-record-lpcm16", "openai", "edge-tts-universal"
   ]
 });

@@ -11,6 +11,9 @@ importers:
       '@clack/prompts':
         specifier: ^1.2.0
         version: 1.2.0
+      '@mozilla/readability':
+        specifier: ^0.6.0
+        version: 0.6.0
       dotenv:
         specifier: ^16.4.5
         version: 16.6.1
@@ -20,6 +23,9 @@ importers:
       ink:
         specifier: ^5.0.1
         version: 5.2.1(@types/react@18.3.28)(react@18.3.1)
+      jsdom:
+        specifier: ^29.1.1
+        version: 29.1.1
       marked:
         specifier: ^15.0.12
         version: 15.0.12
@@ -41,6 +47,12 @@ importers:
       telegraf:
         specifier: ^4.16.3
         version: 4.16.3
+      turndown:
+        specifier: ^7.2.4
+        version: 7.2.4
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
     devDependencies:
       '@types/marked-terminal':
         specifier: ^6.1.1

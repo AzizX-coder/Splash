@@ -13,6 +13,14 @@ export interface GlobalConfigShape {
   defaultProvider?: string;
   defaultModel?: string;
   safetyMode?: "strict" | "standard" | "permissive";
+  safety?: {
+    mode?: "strict" | "standard" | "permissive";
+    blockedPatterns?: string[];
+  };
+  providers?: {
+    default?: string;
+    apiKeys?: Record<string, string>;
+  };
   runtime?: "foreground" | "background";
   tui?: boolean;
   preset?: "fast" | "balanced" | "safe";

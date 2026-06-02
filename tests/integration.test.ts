@@ -34,7 +34,8 @@ function createMockProvider(name: string, responseContent: string = "mock respon
     provider: {
       name,
       isAvailable: () => true,
-      listModels: () => [`${name}-v1`],
+      healthcheck: async () => true,
+      listModels: async () => [{ id: `${name}-v1`, isFree: false }],
       complete: async (): Promise<Result<CompletionResponse>> =>
         ok({
           content: responseContent,
