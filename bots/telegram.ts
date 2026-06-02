@@ -14,6 +14,8 @@ import { Telegraf, Markup } from "telegraf";
 import pc from "picocolors";
 import { runChatTask, getAlpClaw, chunkText } from "./lib/chat-agent.js";
 import { readGlobalConfig, writeGlobalConfig } from "@alpclaw/config";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 const MAX_MSG = 3800;
 
@@ -23,13 +25,13 @@ function ts() {
 
 async function main() {
   console.log("");
-  console.log(pc.bgCyan(pc.black(" ALPCLAW ")) + pc.cyan(" Telegram Bridge"));
+  console.log(pc.bgCyan(pc.black(" SPLASH ")) + pc.cyan(" Telegram Bridge"));
   console.log("");
 
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) {
     console.error(pc.bgRed(pc.white(" ERROR ")) + " TELEGRAM_BOT_TOKEN is not set.");
-    console.error(pc.dim("Run: alpclaw config set-bot telegram TELEGRAM_BOT_TOKEN <token>"));
+    console.error(pc.dim("Run: splash config set-bot telegram TELEGRAM_BOT_TOKEN <token>"));
     process.exit(1);
   }
 
@@ -49,6 +51,132 @@ async function main() {
 
   console.log(pc.dim("─".repeat(60)));
   console.log(pc.dim("Waiting for messages... (Ctrl+C to stop)\n"));
+
+  bot.command("start", async (ctx) => {
+    try {
+      const keyboard = Markup.inlineKeyboard([
+        [Markup.button.callback("🚀 Run Agent", "start:run"), Markup.button.callback("📊 Stats", "start:stats")],
+        [Markup.button.callback("⚙️ Settings", "start:settings"), Markup.button.callback("❓ Help", "start:help")],
+      ]);
+      await ctx.reply("👋 Welcome to Splash! I'm your autonomous agent. What would you like to do?", keyboard);
+    } catch (e: any) {
+      await ctx.reply("⚠️ Failed to start. Please try again.");
+    }
+  });
+
+  bot.command("help", async (ctx) => {
+    const helpText = `
+*Splash Commands:*
+/start - Main menu
+/provider - Switch default provider
+/model <id> - Switch default model
+/mode - Change safety mode
+/memory <query> - Search episodic memory
+/profile - Show user profile summary
+/stats - Show agent statistics
+/help - Show this message
+    `.trim();
+    await ctx.replyWithMarkdown(helpText);
+  });
+
+  bot.command("model", async (ctx) => {
+    try {
+      const parts = ctx.message.text.split(" ");
+      const modelId = parts[1];
+      if (!modelId) {
+        await ctx.reply("⚠️ Usage: /model <model_id>");
+        return;
+      }
+      const cfg = readGlobalConfig();
+      cfg.providers = cfg.providers || { default: "openrouter", apiKeys: {} };
+      cfg.providers.defaultModel = modelId;
+      writeGlobalConfig(cfg);
+      await ctx.reply(`✅ Default model set to: ${modelId}`);
+    } catch (e: any) {
+      await ctx.reply("⚠️ Failed to set model. Please try again.");
+    }
+  });
+
+  bot.command("memory", async (ctx) => {
+    try {
+      const query = ctx.message.text.substring(7).trim();
+      if (!query) {
+        await ctx.reply("⚠️ Usage: /memory <query>");
+        return;
+      }
+      
+      const home = process.env.HOME || process.env.USERPROFILE || "";
+      const sessionsDir = path.resolve(home, ".splash", "memory", "sessions");
+      if (!fs.existsSync(sessionsDir)) {
+        await ctx.reply("ℹ️ No memory sessions found.");
+        return;
+      }
+      
+      const files = fs.readdirSync(sessionsDir).filter((f) => f.endsWith(".jsonl"));
+      let matches = [];
+      for (const file of files) {
+        const content = fs.readFileSync(path.join(sessionsDir, file), "utf-8");
+        const lines = content.split("\\n").filter((l) => l.toLowerCase().includes(query.toLowerCase()));
+        for (const line of lines) {
+          try {
+            const parsed = JSON.parse(line);
+            matches.push(`- ${(parsed.content || parsed.text || "").slice(0, 100)}...`);
+          } catch {
+            matches.push(`- ${line.slice(0, 100)}...`);
+          }
+        }
+      }
+      
+      if (matches.length === 0) {
+        await ctx.reply(`🔍 No memory matches found for "${query}".`);
+      } else {
+        const reply = `🔍 Found ${matches.length} matches for "${query}":\\n\\n${matches.slice(0, 10).join("\\n")}`;
+        await ctx.reply(reply.slice(0, 3800));
+      }
+    } catch (e: any) {
+      await ctx.reply("⚠️ Failed to search memory. Please try again.");
+    }
+  });
+
+  bot.command("profile", async (ctx) => {
+    try {
+      const home = process.env.HOME || process.env.USERPROFILE || "";
+      const profilePath = path.resolve(home, ".splash", "memory", "user-profile.json");
+      if (!fs.existsSync(profilePath)) {
+        await ctx.reply("ℹ️ No user profile data found yet.");
+        return;
+      }
+      const profile = JSON.parse(fs.readFileSync(profilePath, "utf-8"));
+      const facts = profile.facts || [];
+      if (facts.length === 0) {
+        await ctx.reply("ℹ️ User profile is currently empty.");
+        return;
+      }
+      const reply = `👤 *User Profile Facts:*\\n\\n${facts.map((f: any) => `- ${f}`).join("\\n")}`;
+      await ctx.replyWithMarkdown(reply.slice(0, 3800));
+    } catch (e: any) {
+      await ctx.reply("⚠️ Failed to load profile. Please try again.");
+    }
+  });
+
+  bot.command("stats", async (ctx) => {
+    try {
+      const home = process.env.HOME || process.env.USERPROFILE || "";
+      const sessionsDir = path.resolve(home, ".splash", "memory", "sessions");
+      let runCount = 0;
+      if (fs.existsSync(sessionsDir)) {
+        runCount = fs.readdirSync(sessionsDir).filter((f) => f.endsWith(".jsonl")).length;
+      }
+      const cfg = readGlobalConfig();
+      const provider = cfg.providers?.default || "none";
+      const model = cfg.providers?.defaultModel || "none";
+      
+      const reply = `📊 *Splash Agent Stats:*\\n\\nTotal Runs: ${runCount}\\nDefault Provider: ${provider}\\nDefault Model: ${model}`;
+      await ctx.replyWithMarkdown(reply);
+    } catch (e: any) {
+      await ctx.reply("⚠️ Failed to load stats. Please try again.");
+    }
+  });
 
   bot.command("mode", async (ctx) => {
     try {
@@ -91,20 +219,30 @@ async function main() {
       const cfg = readGlobalConfig();
       
       if (action === "mode") {
-        cfg.safety = cfg.safety || { mode: "permissive" };
+        cfg.safety = cfg.safety || { mode: "permissive", blockedPatterns: [], requireConfirmation: [] };
         cfg.safety.mode = value as "permissive" | "strict";
         writeGlobalConfig(cfg);
         await ctx.editMessageText(`✅ Safety mode set to ${value}.`);
       } else if (action === "provider") {
-        cfg.providers = cfg.providers || { default: value, apiKeys: {} };
+        cfg.providers = cfg.providers || { default: value, defaultModel: "moonshotai/kimi-k2", apiKeys: {} };
         cfg.providers.default = value;
         writeGlobalConfig(cfg);
         await ctx.editMessageText(`✅ Provider set to ${value}.`);
+      } else if (action === "start") {
+        if (value === "run") {
+          await ctx.editMessageText("🚀 Send me a message to start running the agent.");
+        } else if (value === "stats") {
+          await ctx.editMessageText("📊 Run /stats to see your usage.");
+        } else if (value === "settings") {
+          await ctx.editMessageText("⚙️ Run /mode, /provider, or /model to change settings.");
+        } else if (value === "help") {
+          await ctx.editMessageText("❓ Run /help for a list of commands.");
+        }
       }
       
       await ctx.answerCbQuery();
     } catch (e: any) {
-       await ctx.answerCbQuery("Error updating config.").catch(() => null);
+       await ctx.answerCbQuery("Error processing request.").catch(() => null);
     }
   });
 
