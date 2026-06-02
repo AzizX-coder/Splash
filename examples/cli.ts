@@ -186,7 +186,7 @@ function printHelp(): void {
 
 async function runInit() {
   console.log(renderBanner({ subtitle: "Setup" }));
-  p.intro(pc.bgCyan(pc.black(" 💧 SPLASH INIT ")));
+  p.intro(pc.bgCyan(pc.black(" SPLASH INIT ")));
   p.log.message("Pick a provider and drop in a key. You can change this any time with `splash config`.");
 
   const existing = readGlobalConfig();
@@ -196,18 +196,12 @@ async function runInit() {
   const provider = await p.select({
     message: "1. Default provider:",
     options: [
-      { value: "openrouter", label: "OpenRouter — recommended, unlocks massive model catalog" },
-      { value: "claude",     label: "Anthropic Claude" },
-      { value: "openai",     label: "OpenAI (GPT-4o)" },
-      { value: "gemini",     label: "Google Gemini" },
-      { value: "deepseek",   label: "DeepSeek" },
-      { value: "nous",       label: "Nous Portal" },
-      { value: "groq",       label: "Groq (ultra-fast)" },
-      { value: "mistral",    label: "Mistral" },
-      { value: "cerebras",   label: "Cerebras" },
-      { value: "cohere",     label: "Cohere" },
-      { value: "nvidia",     label: "NVIDIA NIM" },
-      { value: "ollama",     label: "Ollama (local, no key needed)" },
+      { value: "openrouter", label: "OpenRouter — recommended, unlocks 300+ models" },
+      { value: "claude",     label: "Anthropic Claude — direct API" },
+      { value: "openai",     label: "OpenAI — GPT-4o, o3, o4-mini" },
+      { value: "gemini",     label: "Google Gemini — 2.5 Pro/Flash" },
+      { value: "deepseek",   label: "DeepSeek — R1, V3 (affordable)" },
+      { value: "ollama",     label: "Ollama — local models, no key needed" },
     ],
   });
   if (p.isCancel(provider)) return abort();
@@ -224,12 +218,14 @@ async function runInit() {
     const model = await p.select({
       message: "3. Default model:",
       options: [
-        { value: "moonshotai/kimi-k2",           label: "Kimi K2 (Moonshot) — long context, strong coding" },
-        { value: "moonshotai/kimi-k2-0905",      label: "Kimi K2 0905 (newer snapshot)" },
-        { value: "anthropic/claude-3.5-sonnet",  label: "Claude 3.5 Sonnet" },
-        { value: "deepseek/deepseek-chat",       label: "DeepSeek V3" },
-        { value: "qwen/qwen-2.5-coder-32b-instruct", label: "Qwen 2.5 Coder 32B" },
-        { value: "openai/gpt-4o",                label: "GPT-4o" },
+        { value: "anthropic/claude-sonnet-4",          label: "Claude Sonnet 4 (Anthropic) — best overall" },
+        { value: "google/gemini-2.5-flash-preview",    label: "Gemini 2.5 Flash (Google) — fast and capable" },
+        { value: "openai/gpt-4.1",                     label: "GPT-4.1 (OpenAI) — reliable all-rounder" },
+        { value: "deepseek/deepseek-r1",               label: "DeepSeek R1 — strong reasoning, free tier" },
+        { value: "moonshotai/kimi-k2",                 label: "Kimi K2 (Moonshot) — 128k context, free tier" },
+        { value: "qwen/qwen3-235b-a22b",               label: "Qwen3 235B (Alibaba) — massive, free tier" },
+        { value: "meta-llama/llama-4-maverick",         label: "Llama 4 Maverick (Meta) — open weights" },
+        { value: "mistralai/mistral-medium-3",          label: "Mistral Medium 3 — European, fast" },
       ],
     });
     if (!p.isCancel(model)) next.defaultModel = model as string;
@@ -248,15 +244,13 @@ async function runInit() {
   const theme = await p.select({
     message: "5. CLI Theme:",
     options: [
-      { value: "splash",     label: "Splash (Default) — Water animations & rich output" },
-      { value: "hermes",     label: "Hermes — Clean bracket-based logs" },
-      { value: "openclaw",   label: "OpenClaw — Compact status-light header" },
+      { value: "splash",     label: "Splash (Default) — Gradient output with animations" },
       { value: "minimal",    label: "Minimal — Pure prompt, silent execution" },
     ],
   });
   if (!p.isCancel(theme)) {
     next.cli = next.cli || {};
-    next.cli.style = theme as "splash" | "hermes" | "openclaw" | "minimal";
+    next.cli.style = theme as "splash" | "minimal";
   }
 
   writeGlobalConfig(next);
@@ -463,7 +457,7 @@ async function runDoctor(args: string[]): Promise<void> {
     return;
   }
 
-  console.log(pc.cyan(pc.bold("💧 splash config doctor")));
+  console.log(pc.cyan(pc.bold("splash config doctor")));
   console.log();
   for (const c of checks) {
     const icon = c.ok ? pc.green("✓") : pc.red("✗");
@@ -666,7 +660,7 @@ function getOutput(res: any): string {
 }
 
 async function runSelfImprove() {
-  console.log(pc.magenta("\n🧠 SPLASH SELF-MODIFICATION ENGINE"));
+  console.log(pc.magenta("\nSPLASH SELF-MODIFICATION ENGINE"));
   console.log(pc.dim("Analyzing recent sessions to extract learnings...\n"));
   
   const { EpisodicMemory } = await import("@alpclaw/memory");
@@ -714,7 +708,7 @@ Output ONLY a list of crisp, actionable rules you should adopt. Do not explain t
 // ──────────────────────────────────────────────────────────────────────────
 
 async function runVoiceChat() {
-  console.log(pc.magenta("\n🎙️ SPLASH VOICE CHAT"));
+  console.log(pc.magenta("\nSPLASH VOICE CHAT"));
   console.log(pc.dim("Initializing Whisper STT and Edge TTS..."));
   
   console.log(pc.yellow("Note: Live audio recording requires 'sox' to be installed on your system."));
@@ -762,7 +756,7 @@ async function runSwarm(task: string) {
     return;
   }
   
-  console.log(pc.magenta(`\n🐝 SPLASH SWARM: ${task}`));
+  console.log(pc.magenta(`\nSPLASH SWARM: ${task}`));
   console.log(pc.dim("Splitting task into 3 parallel sub-agents...\n"));
   
   const alpclaw = await buildAgent();
@@ -791,7 +785,7 @@ ${getOutput(results[2])}
 `;
 
   const finalRes = await alpclaw.createAgent().run(leaderPrompt);
-  console.log(pc.bold("\n👑 Leader Conclusion:\n"));
+  console.log(pc.bold("\nLeader Conclusion:\n"));
   console.log(getOutput(finalRes));
 }
 
@@ -805,7 +799,7 @@ async function runAntigravity(args: string[]) {
     return;
   }
   
-  console.log(pc.magenta("\n🛸 STARTING ANTIGRAVITY DAEMON"));
+  console.log(pc.magenta("\nSTARTING ANTIGRAVITY DAEMON"));
   
   const { spawn } = await import("node:child_process");
   const path = await import("node:path");

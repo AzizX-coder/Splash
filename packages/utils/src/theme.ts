@@ -56,7 +56,7 @@ export const I = {
   diamond: "◆",
 
   /** Droplet — the Splash mascot */
-  drop: "💧",
+  drop: "~",
   /** Wave */
   wave: "≈",
 };
@@ -125,7 +125,7 @@ export function renderBanner(opts?: { subtitle?: string; compact?: boolean }): s
   };
 
   const logo = [
-    "   💧   ",
+    "         ",
     " ≈≈≈≈≈≈ ",
     " SPLASH "
   ];
@@ -137,8 +137,8 @@ export function renderBanner(opts?: { subtitle?: string; compact?: boolean }): s
   const leftPadCount = Math.max(0, Math.floor((terminalWidth - logoWidth) / 2));
   const pad = " ".repeat(leftPadCount);
 
-  const titleStrip = `${style.sky("≈".repeat(10))}  💧 ${style.bold(style.white(subtitle))} 💧  ${style.sky("≈".repeat(10))}`;
-  const rawTitleLen = 20 + 6 + subtitle.length + 6;
+  const titleStrip = `${style.sky("≈".repeat(10))}  ${style.bold(style.white(subtitle))}  ${style.sky("≈".repeat(10))}`;
+  const rawTitleLen = 20 + 2 + subtitle.length + 2;
   const titlePadCount = Math.max(0, Math.floor((terminalWidth - rawTitleLen) / 2));
   const titlePad = " ".repeat(titlePadCount);
 
@@ -245,7 +245,7 @@ export async function pulseWordmark(word: string = "Splash", cycles: number = 2)
 export const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 /** Droplet loader frames — playful water-themed. */
-export const DROP_FRAMES = ["💧 ", " 💧", "  💧", "   💧", "💦", "💧💧", "💧"];
+export const DROP_FRAMES = ["~ ", " ~", "  ~", "   ~", "~~", "~~~", "~"];
 
 /** Wave loader frames. */
 export const WAVE_FRAMES = [
@@ -313,7 +313,7 @@ export function startLoader(
 /** Quick helper to print a droplet splash "ripple" effect as a heading. */
 export async function ripple(text: string): Promise<void> {
   if (skipAnim()) {
-    console.log(style.heading(`💧 ${text}`));
+    console.log(style.heading(`~ ${text}`));
     return;
   }
   const widths = [1, 3, 5, 7, 5, 3, 1];
