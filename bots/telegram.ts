@@ -69,7 +69,6 @@ async function main() {
 *Splash Commands:*
 /start - Main menu
 /provider - Switch default provider
-/model <id> - Switch default model
 /mode - Change safety mode
 /memory <query> - Search episodic memory
 /profile - Show user profile summary
@@ -77,24 +76,6 @@ async function main() {
 /help - Show this message
     `.trim();
     await ctx.replyWithMarkdown(helpText);
-  });
-
-  bot.command("model", async (ctx) => {
-    try {
-      const parts = ctx.message.text.split(" ");
-      const modelId = parts[1];
-      if (!modelId) {
-        await ctx.reply("⚠️ Usage: /model <model_id>");
-        return;
-      }
-      const cfg = readGlobalConfig();
-      cfg.providers = cfg.providers || { default: "openrouter", apiKeys: {} };
-      cfg.providers.defaultModel = modelId;
-      writeGlobalConfig(cfg);
-      await ctx.reply(`✅ Default model set to: ${modelId}`);
-    } catch (e: any) {
-      await ctx.reply("⚠️ Failed to set model. Please try again.");
-    }
   });
 
   bot.command("memory", async (ctx) => {
@@ -169,9 +150,8 @@ async function main() {
       }
       const cfg = readGlobalConfig();
       const provider = cfg.providers?.default || "none";
-      const model = cfg.providers?.defaultModel || "none";
       
-      const reply = `📊 *Splash Agent Stats:*\\n\\nTotal Runs: ${runCount}\\nDefault Provider: ${provider}\\nDefault Model: ${model}`;
+      const reply = `📊 *Splash Agent Stats:*\\n\\nTotal Runs: ${runCount}\\nDefault Provider: ${provider}`;
       await ctx.replyWithMarkdown(reply);
     } catch (e: any) {
       await ctx.reply("⚠️ Failed to load stats. Please try again.");
@@ -219,12 +199,12 @@ async function main() {
       const cfg = readGlobalConfig();
       
       if (action === "mode") {
-        cfg.safety = cfg.safety || { mode: "permissive", blockedPatterns: [], requireConfirmation: [] };
+        cfg.safety = cfg.safety || { mode: "permissive" };
         cfg.safety.mode = value as "permissive" | "strict";
         writeGlobalConfig(cfg);
         await ctx.editMessageText(`✅ Safety mode set to ${value}.`);
       } else if (action === "provider") {
-        cfg.providers = cfg.providers || { default: value, defaultModel: "moonshotai/kimi-k2", apiKeys: {} };
+        cfg.providers = cfg.providers || { default: value, apiKeys: {} };
         cfg.providers.default = value;
         writeGlobalConfig(cfg);
         await ctx.editMessageText(`✅ Provider set to ${value}.`);
@@ -234,7 +214,7 @@ async function main() {
         } else if (value === "stats") {
           await ctx.editMessageText("📊 Run /stats to see your usage.");
         } else if (value === "settings") {
-          await ctx.editMessageText("⚙️ Run /mode, /provider, or /model to change settings.");
+          await ctx.editMessageText("⚙️ Run /mode or /provider to change settings.");
         } else if (value === "help") {
           await ctx.editMessageText("❓ Run /help for a list of commands.");
         }
