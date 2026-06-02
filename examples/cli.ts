@@ -79,20 +79,20 @@ const BOT_SPECS: Record<
 // ──────────────────────────────────────────────────────────────────────────
 
 function getLevenshteinDistance(a: string, b: string): number {
-  const matrix = Array(b.length + 1).fill(null).map(() => Array(a.length + 1).fill(null));
-  for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
-  for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
+  const matrix: number[][] = Array(b.length + 1).fill(null).map(() => Array(a.length + 1).fill(0));
+  for (let i = 0; i <= a.length; i++) matrix[0]![i] = i;
+  for (let j = 0; j <= b.length; j++) matrix[j]![0] = j;
   for (let j = 1; j <= b.length; j++) {
     for (let i = 1; i <= a.length; i++) {
       const indicator = a[i - 1] === b[j - 1] ? 0 : 1;
-      matrix[j][i] = Math.min(
-        matrix[j][i - 1] + 1,
-        matrix[j - 1][i] + 1,
-        matrix[j - 1][i - 1] + indicator
+      matrix[j]![i] = Math.min(
+        matrix[j]![i - 1]! + 1,
+        matrix[j - 1]![i]! + 1,
+        matrix[j - 1]![i - 1]! + indicator
       );
     }
   }
-  return matrix[b.length][a.length];
+  return matrix[b.length]![a.length]!;
 }
 
 async function main() {
@@ -217,6 +217,8 @@ async function main() {
       break;
   }
 
+  const bg = args.includes("--background") || args.includes("-b");
+  const promptText = args.filter((a) => a !== "--background" && a !== "-b").join(" ");
   await runFromCli(promptText, { background: bg });
 }
 
@@ -310,13 +312,15 @@ async function runInit() {
   const theme = await p.select({
     message: "5. CLI Theme:",
     options: [
-      { value: "splash",     label: "Splash (Default) — Gradient output with animations" },
-      { value: "minimal",    label: "Minimal — Pure prompt, silent execution" },
+      { value: "splash",     label: "Splash (Default) — Compact colored banner + minimal output" },
+      { value: "hydro",      label: "Hydro — Blue ANSI feel, compact" },
+      { value: "edge",       label: "Edge — No color, no banner, just prompt" },
+      { value: "silent",     label: "Silent — Pure prompt, silent execution" },
     ],
   });
   if (!p.isCancel(theme)) {
     next.cli = next.cli || {};
-    next.cli.style = theme as "splash" | "minimal";
+    next.cli.style = theme as "splash" | "hydro" | "edge" | "silent";
   }
 
   writeGlobalConfig(next);
@@ -701,7 +705,7 @@ async function checkFastPath(prompt: string): Promise<boolean> {
   const createMatch = lowerPrompt.match(/^(?:(?:run\s+)?(?:create|make)\s+file)\s+(.+)$/);
   if (createMatch) {
     try {
-      fs.writeFileSync(path.resolve(process.cwd(), createMatch[1]), "");
+      fs.writeFileSync(path.resolve(process.cwd(), createMatch[1]!), "");
       console.log(`[OK] file created: ${createMatch[1]}`);
     } catch (e: any) {
       console.log(`[ERR] failed to create file: ${e.message}`);
@@ -712,7 +716,7 @@ async function checkFastPath(prompt: string): Promise<boolean> {
   const runMatch = lowerPrompt.match(/^(?:(?:run\s+)?command|execute)\s+(.+)$/);
   if (runMatch) {
     try {
-      spawnSync(runMatch[1], { shell: true, stdio: "inherit" });
+      spawnSync(runMatch[1]!, { shell: true, stdio: "inherit" });
       console.log(`[OK] command executed: ${runMatch[1]}`);
     } catch (e: any) {
       console.log(`[ERR] command failed: ${e.message}`);
@@ -726,7 +730,7 @@ async function checkFastPath(prompt: string): Promise<boolean> {
     const { WebSearchSkill } = await import("@alpclaw/skills");
     const skill = new WebSearchSkill();
     const result = await skill.execute({ query: searchMatch[1] }, {} as any);
-    console.log(result.output || "[INFO] No results found.");
+    console.log((result as any).output || "[INFO] No results found.");
     return true;
   }
 
@@ -1419,7 +1423,7 @@ function printStatusLine(a: AlpClaw): void {
   const runtime = cfg.runtime || "foreground";
   const style = cfg.cli?.style || "splash";
 
-  if (style === "minimal") {
+  if (style === "silent") {
     // No banner/status line for minimal
     return;
   }
@@ -1443,7 +1447,7 @@ async function runOneShot(alpclaw: AlpClaw, description: string, persona?: strin
   let lastTool = "";
 
   const updateSpinner = (message: string) => {
-    if (style === "minimal") return; // Silent execution
+    if (style === "silent") return; // Silent execution
     
 
     // Default Splash style
@@ -1463,7 +1467,7 @@ async function runOneShot(alpclaw: AlpClaw, description: string, persona?: strin
       updateSpinner(PHASE_LABELS[phase] || phase);
     },
     onToolCall: (toolName: string, args: Record<string, unknown>) => {
-      if (style === "minimal") return;
+      if (style === "silent") return;
       
       
       // Default Splash style
@@ -1500,7 +1504,7 @@ async function runOneShot(alpclaw: AlpClaw, description: string, persona?: strin
     const task = result.value;
     const body = task.result?.summary ? marked.parse(task.result.summary) : "No output.";
     
-    if (style !== "minimal") {
+    if (style !== "silent") {
       p.note(
         [
           `${pc.cyan("status:")} ${task.status === "completed" ? pc.green(task.status) : pc.yellow(task.status)}`,
@@ -1513,7 +1517,7 @@ async function runOneShot(alpclaw: AlpClaw, description: string, persona?: strin
       console.log(`\n${body}`);
     }
   } else {
-    if (style !== "minimal") {
+    if (style !== "silent") {
       p.log.error(pc.bgRed(pc.white(" ERROR ")) + " " + result.error.message);
     } else {
       console.error(`${pc.red("x")} ${result.error.message}`);
