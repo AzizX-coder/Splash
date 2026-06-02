@@ -55,7 +55,7 @@ import {
 import { createLogger } from "@alpclaw/utils";
 import { AgentLoop, type AgentLoopCallbacks } from "./agent-loop.js";
 
-const log = createLogger("alpclaw");
+const log = createLogger("splash");
 
 /**
  * AlpClaw is the main entry point / factory for building an agent instance.

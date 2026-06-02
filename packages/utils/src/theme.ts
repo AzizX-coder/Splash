@@ -92,6 +92,11 @@ export const style = {
 export function renderBanner(opts?: { subtitle?: string; compact?: boolean }): string {
   const { subtitle = "Autonomous Agent Platform", compact = false } = opts || {};
 
+  // Respect NO_SPLASH=1 to suppress all art
+  if (process.env.NO_SPLASH === "1") {
+    return `\n  splash — ${subtitle}\n`;
+  }
+
   if (compact) {
     return [
       "",

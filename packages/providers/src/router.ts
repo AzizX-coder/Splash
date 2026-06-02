@@ -51,11 +51,13 @@ export class ProviderRouter {
     return this.providers.get(name);
   }
 
-  /** List all registered providers. */
-  listProviders(): { name: string; available: boolean }[] {
+  /** List all registered providers with their instances and capabilities. */
+  listProviders(): { name: string; available: boolean; provider: ModelProvider; capabilities: ProviderCapabilities }[] {
     return Array.from(this.providers.entries()).map(([name, provider]) => ({
       name,
       available: provider.isAvailable(),
+      provider,
+      capabilities: this.capabilities.get(name)!,
     }));
   }
 

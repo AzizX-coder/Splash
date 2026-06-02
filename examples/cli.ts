@@ -41,6 +41,15 @@ import { markedTerminal } from "marked-terminal";
 
 marked.use(markedTerminal() as any);
 
+// Read version from package.json at the repo root (works in bundled dist too via import.meta)
+import { createRequire } from "node:module";
+const _require = createRequire(import.meta.url);
+let VERSION = "2.1.0";
+try {
+  const pkg = _require("../package.json");
+  VERSION = pkg.version || VERSION;
+} catch { /* bundled — use hardcoded */ }
+
 const PHASE_LABELS: Record<AgentPhase, string> = {
   intake: "Receiving task",
   understand: "Understanding intent",
@@ -82,7 +91,7 @@ async function main() {
     case "version":
     case "--version":
     case "-v":
-      console.log(`splash-agent v${process.env.npm_package_version || "2.0.3"}`);
+      console.log(`splash-agent v${VERSION}`);
       return;
     case "help":
     case "--help":
@@ -115,6 +124,18 @@ async function main() {
       return;
     case "self-improve":
       await runSelfImprove();
+      return;
+    case "providers":
+      await runProviders(args.slice(1));
+      return;
+    case "skills":
+      await runSkills(args.slice(1));
+      return;
+    case "memory":
+      await runMemory(args.slice(1));
+      return;
+    case "maintenance":
+      await runMaintenance(args.slice(1));
       return;
     case "voice":
       await runVoiceChat();
@@ -165,16 +186,18 @@ function printHelp(): void {
   console.log(
     [
       "",
-      `  ${pc.cyan("Run   ")} ${pc.dim("│")} run, exec, ask, "prompt"`,
-      `  ${pc.cyan("Memory")} ${pc.dim("│")} memory list/search/export, profile show/set`,
-      `  ${pc.cyan("Config")} ${pc.dim("│")} config list/get/set, providers list/test`,
-      `  ${pc.cyan("Skills")} ${pc.dim("│")} skills list, skills enable/disable, skills suggest`,
-      `  ${pc.cyan("Runs  ")} ${pc.dim("│")} runs list/logs/stop/retry`,
-      `  ${pc.cyan("System")} ${pc.dim("│")} doctor, update, auth, init, self-improve`,
-      `  ${pc.cyan("Advanced")} ${pc.dim("│")} voice, swarm <task>, antigravity start`,
+      `  ${pc.cyan("Run      ")} ${pc.dim("|")} splash "prompt", run, exec, ask`,
+      `  ${pc.cyan("Config   ")} ${pc.dim("|")} config list/get/set/set-key/set-bot/doctor/preset`,
+      `  ${pc.cyan("Providers")} ${pc.dim("|")} providers list, providers test <name>`,
+      `  ${pc.cyan("Skills   ")} ${pc.dim("|")} skills list`,
+      `  ${pc.cyan("Memory   ")} ${pc.dim("|")} memory list/search/export`,
+      `  ${pc.cyan("Runs     ")} ${pc.dim("|")} runs list/logs/stop/retry/attach/show`,
+      `  ${pc.cyan("System   ")} ${pc.dim("|")} init, maintenance [--apply], self-improve`,
+      `  ${pc.cyan("Advanced ")} ${pc.dim("|")} voice, swarm <task>, antigravity start`,
       "",
-      pc.dim(`  Config: ${globalConfigPath()}`),
-      pc.dim(`  Env:    SPLASH_* vars work. .env in cwd is read.`),
+      pc.dim(`  Version: ${VERSION}`),
+      pc.dim(`  Config:  ${globalConfigPath()}`),
+      pc.dim(`  Env:     SPLASH_* vars and .env in cwd are loaded.`),
       "",
     ].join("\n")
   );
@@ -503,7 +526,7 @@ async function runRunsCmd(args: string[]): Promise<void> {
       console.log(pc.dim("no runs yet. Start one with `splash \"do X\" --background`"));
       return;
     }
-    console.log(pc.cyan(pc.bold("💧 runs")));
+    console.log(pc.cyan(pc.bold("runs")));
     for (const r of list.slice(0, 30)) {
       const color = statusColor(r.status);
       console.log(
@@ -852,6 +875,343 @@ setInterval(() => {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
+// Providers
+// ──────────────────────────────────────────────────────────────────────────
+
+async function runProviders(args: string[]): Promise<void> {
+  const sub = args[0] || "list";
+
+  if (sub === "list") {
+    const alpclaw = await buildAgent();
+    const providers = alpclaw.router.listProviders();
+    console.log(pc.bold("\n  Configured Providers\n"));
+    console.log(
+      `  ${pc.dim("Name".padEnd(14))} ${pc.dim("Status".padEnd(10))} ${pc.dim("Models")}`,
+    );
+    console.log(pc.dim("  " + "-".repeat(40)));
+
+    for (const prov of providers) {
+      let status = pc.green("ready");
+      let modelCount = "-";
+      try {
+        const models = await prov.provider.listModels();
+        modelCount = String(models.length);
+        if (!prov.provider.isAvailable()) status = pc.yellow("no key");
+      } catch {
+        status = pc.red("error");
+      }
+      console.log(
+        `  ${pc.white(prov.name.padEnd(14))} ${status.padEnd(10)} ${pc.dim(modelCount)}`,
+      );
+    }
+    console.log();
+    return;
+  }
+
+  if (sub === "test") {
+    const name = args[1];
+    if (!name) {
+      console.error(pc.red("Usage: splash providers test <name>"));
+      return;
+    }
+    const alpclaw = await buildAgent();
+    const match = alpclaw.router.listProviders().find((p) => p.name === name);
+    if (!match) {
+      console.error(pc.red(`Provider "${name}" not found. Run: splash providers list`));
+      return;
+    }
+    console.log(pc.dim(`Pinging ${name}...`));
+    const start = Date.now();
+    try {
+      const healthy = await match.provider.healthcheck();
+      const elapsed = Date.now() - start;
+      if (healthy) {
+        console.log(pc.green(`  ${name}: healthy (${elapsed}ms)`));
+      } else {
+        console.log(pc.yellow(`  ${name}: unhealthy (${elapsed}ms)`));
+      }
+    } catch (e: unknown) {
+      const elapsed = Date.now() - start;
+      const msg = e instanceof Error ? e.message : String(e);
+      console.log(pc.red(`  ${name}: error (${elapsed}ms) — ${msg}`));
+    }
+    return;
+  }
+
+  console.error(pc.red(`Unknown subcommand: providers ${sub}`));
+  console.log(pc.dim("  Available: list, test <name>"));
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Skills
+// ──────────────────────────────────────────────────────────────────────────
+
+async function runSkills(args: string[]): Promise<void> {
+  const sub = args[0] || "list";
+
+  if (sub === "list") {
+    const alpclaw = await buildAgent();
+    const skills = alpclaw.skills.list();
+    console.log(pc.bold(`\n  Registered Skills (${skills.length})\n`));
+    for (const skill of skills) {
+      const tags = skill.tags?.join(", ") || "";
+      console.log(
+        `  ${pc.cyan(skill.name.padEnd(20))} ${pc.dim(tags)}`,
+      );
+    }
+    console.log();
+    return;
+  }
+
+  console.error(pc.red(`Unknown subcommand: skills ${sub}`));
+  console.log(pc.dim("  Available: list"));
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Memory
+// ──────────────────────────────────────────────────────────────────────────
+
+async function runMemory(args: string[]): Promise<void> {
+  const sub = args[0] || "list";
+  const home = process.env.HOME || process.env.USERPROFILE || "";
+  const memDir = path.resolve(home, ".splash", "memory");
+  const sessionsDir = path.join(memDir, "sessions");
+
+  if (sub === "list") {
+    if (!fs.existsSync(sessionsDir)) {
+      console.log(pc.dim("No sessions recorded yet."));
+      return;
+    }
+    const files = fs.readdirSync(sessionsDir).filter((f) => f.endsWith(".jsonl"));
+    console.log(pc.bold(`\n  Memory Sessions (${files.length})\n`));
+    for (const file of files.slice(-20)) {
+      const stat = fs.statSync(path.join(sessionsDir, file));
+      const size = (stat.size / 1024).toFixed(1);
+      console.log(`  ${pc.cyan(file.padEnd(40))} ${pc.dim(size + " KB")}`);
+    }
+    console.log();
+    return;
+  }
+
+  if (sub === "search") {
+    const query = args.slice(1).join(" ");
+    if (!query) {
+      console.error(pc.red("Usage: splash memory search <query>"));
+      return;
+    }
+    if (!fs.existsSync(sessionsDir)) {
+      console.log(pc.dim("No sessions to search."));
+      return;
+    }
+    console.log(pc.dim(`Searching sessions for "${query}"...\n`));
+    const files = fs.readdirSync(sessionsDir).filter((f) => f.endsWith(".jsonl"));
+    let matches = 0;
+    for (const file of files) {
+      const content = fs.readFileSync(path.join(sessionsDir, file), "utf-8");
+      const lines = content.split("\n").filter((l) => l.toLowerCase().includes(query.toLowerCase()));
+      if (lines.length > 0) {
+        matches += lines.length;
+        console.log(pc.cyan(`  ${file}`) + pc.dim(` (${lines.length} matches)`));
+        for (const line of lines.slice(0, 3)) {
+          try {
+            const parsed = JSON.parse(line);
+            console.log(pc.dim(`    ${(parsed.content || parsed.text || "").slice(0, 100)}`));
+          } catch {
+            console.log(pc.dim(`    ${line.slice(0, 100)}`));
+          }
+        }
+      }
+    }
+    if (matches === 0) console.log(pc.dim("  No matches found."));
+    console.log();
+    return;
+  }
+
+  if (sub === "export") {
+    if (!fs.existsSync(sessionsDir)) {
+      console.log(pc.dim("No sessions to export."));
+      return;
+    }
+    const outFile = args[1] || "splash-memory-export.json";
+    const files = fs.readdirSync(sessionsDir).filter((f) => f.endsWith(".jsonl"));
+    const allEntries: unknown[] = [];
+    for (const file of files) {
+      const content = fs.readFileSync(path.join(sessionsDir, file), "utf-8");
+      for (const line of content.split("\n").filter(Boolean)) {
+        try { allEntries.push(JSON.parse(line)); } catch { /* skip malformed */ }
+      }
+    }
+    fs.writeFileSync(outFile, JSON.stringify(allEntries, null, 2));
+    console.log(pc.green(`Exported ${allEntries.length} entries to ${outFile}`));
+    return;
+  }
+
+  console.error(pc.red(`Unknown subcommand: memory ${sub}`));
+  console.log(pc.dim("  Available: list, search <query>, export [file]"));
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Maintenance
+// ──────────────────────────────────────────────────────────────────────────
+
+async function runMaintenance(args: string[]): Promise<void> {
+  const apply = args.includes("--apply");
+  const json = args.includes("--json");
+
+  const home = process.env.HOME || process.env.USERPROFILE || "";
+  const splashDir = path.resolve(home, ".splash");
+  const memDir = path.join(splashDir, "memory");
+  const logsDir = path.join(splashDir, "logs");
+  const auditFile = path.join(logsDir, "audit.jsonl");
+
+  interface Check {
+    name: string;
+    status: "ok" | "warn" | "fail";
+    detail: string;
+    fix?: () => void;
+  }
+
+  const checks: Check[] = [];
+
+  // 1. Config check
+  try {
+    const cfg = readGlobalConfig();
+    const hasKey = Object.values(cfg.apiKeys || {}).some(Boolean);
+    if (hasKey) {
+      checks.push({ name: "API keys", status: "ok", detail: `${Object.keys(cfg.apiKeys || {}).length} provider(s) configured` });
+    } else {
+      checks.push({ name: "API keys", status: "warn", detail: "No API keys set. Run: splash init" });
+    }
+    if (cfg.defaultProvider) {
+      checks.push({ name: "Default provider", status: "ok", detail: cfg.defaultProvider });
+    } else {
+      checks.push({ name: "Default provider", status: "warn", detail: "Not set. Run: splash init" });
+    }
+  } catch {
+    checks.push({ name: "Config", status: "fail", detail: "Failed to read config. Run: splash init" });
+  }
+
+  // 2. Provider health
+  try {
+    const alpclaw = await AlpClaw.create();
+    const providers = alpclaw.router.listProviders();
+    for (const prov of providers) {
+      if (!prov.provider.isAvailable()) {
+        checks.push({ name: `Provider: ${prov.name}`, status: "warn", detail: "not configured (no API key)" });
+        continue;
+      }
+      try {
+        const start = Date.now();
+        const healthy = await prov.provider.healthcheck();
+        const elapsed = Date.now() - start;
+        checks.push({
+          name: `Provider: ${prov.name}`,
+          status: healthy ? "ok" : "warn",
+          detail: healthy ? `healthy (${elapsed}ms)` : `unhealthy (${elapsed}ms)`,
+        });
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        checks.push({ name: `Provider: ${prov.name}`, status: "fail", detail: msg.slice(0, 80) });
+      }
+    }
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    checks.push({ name: "Provider init", status: "fail", detail: msg.slice(0, 80) });
+  }
+
+  // 3. Memory disk usage
+  if (fs.existsSync(memDir)) {
+    let totalBytes = 0;
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(p);
+        else totalBytes += fs.statSync(p).size;
+      }
+    };
+    walk(memDir);
+    const mb = (totalBytes / 1024 / 1024).toFixed(1);
+    if (totalBytes > 500 * 1024 * 1024) {
+      checks.push({
+        name: "Memory disk",
+        status: "warn",
+        detail: `${mb} MB (exceeds 500 MB limit)`,
+        fix: () => {
+          const sessionsDir = path.join(memDir, "sessions");
+          if (fs.existsSync(sessionsDir)) {
+            const files = fs.readdirSync(sessionsDir).sort();
+            const toRemove = Math.ceil(files.length * 0.2);
+            for (const f of files.slice(0, toRemove)) {
+              fs.unlinkSync(path.join(sessionsDir, f));
+            }
+            console.log(pc.dim(`  Pruned ${toRemove} oldest session files.`));
+          }
+        },
+      });
+    } else {
+      checks.push({ name: "Memory disk", status: "ok", detail: `${mb} MB` });
+    }
+  } else {
+    checks.push({ name: "Memory disk", status: "ok", detail: "No memory directory yet" });
+  }
+
+  // 4. Prompts check
+  const promptsDir = path.resolve(splashDir, "..", "..", "prompts"); // repo root fallback
+  const localPrompts = path.resolve(process.cwd(), "prompts");
+  const hasPrompts = fs.existsSync(localPrompts) && fs.readdirSync(localPrompts).some((f) => f.endsWith(".md"));
+  checks.push({
+    name: "Prompt library",
+    status: hasPrompts ? "ok" : "warn",
+    detail: hasPrompts ? `Found in ${localPrompts}` : "No prompts/ directory in cwd",
+  });
+
+  // 5. Config file exists
+  const configFile = globalConfigPath();
+  checks.push({
+    name: "Config file",
+    status: fs.existsSync(configFile) ? "ok" : "warn",
+    detail: fs.existsSync(configFile) ? configFile : "Missing. Run: splash init",
+  });
+
+  // Output
+  if (json) {
+    console.log(JSON.stringify({ checks, applied: apply }, null, 2));
+    return;
+  }
+
+  console.log(pc.bold("\n  Splash Maintenance Report\n"));
+  for (const c of checks) {
+    const icon = c.status === "ok" ? pc.green("ok") : c.status === "warn" ? pc.yellow("!!") : pc.red("FAIL");
+    console.log(`  [${icon}] ${pc.bold(c.name.padEnd(22))} ${pc.dim(c.detail)}`);
+  }
+
+  const fixable = checks.filter((c) => c.fix);
+  if (fixable.length > 0 && apply) {
+    console.log(pc.bold("\n  Applying fixes...\n"));
+    // Write audit log
+    if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+    for (const c of fixable) {
+      const entry = { ts: new Date().toISOString(), action: "maintenance-fix", check: c.name, detail: c.detail };
+      fs.appendFileSync(auditFile, JSON.stringify(entry) + "\n");
+      c.fix!();
+      console.log(pc.green(`  Fixed: ${c.name}`));
+    }
+  } else if (fixable.length > 0 && !apply) {
+    console.log(pc.dim(`\n  ${fixable.length} fixable issue(s). Run: splash maintenance --apply`));
+  }
+
+  const bad = checks.filter((c) => c.status === "fail").length;
+  const warned = checks.filter((c) => c.status === "warn").length;
+  console.log();
+  if (bad === 0 && warned === 0) {
+    console.log(pc.green("  All checks passed."));
+  } else {
+    console.log(pc.dim(`  ${checks.length} checks: ${checks.length - bad - warned} ok, ${warned} warnings, ${bad} failures`));
+  }
+  console.log();
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 // Bots
 // ──────────────────────────────────────────────────────────────────────────
 
@@ -979,21 +1339,13 @@ function printStatusLine(a: AlpClaw): void {
   const runtime = cfg.runtime || "foreground";
   const style = cfg.cli?.style || "splash";
 
-  if (style === "hermes" || style === "minimal") {
-    // No banner/status line for minimal/hermes
-    return;
-  }
-
-  if (style === "openclaw") {
-    console.log(
-      `${pc.green("● ready")} ${pc.dim("│")} providers: 11 ${pc.dim("│")} model: ${pc.cyan(pConf.defaultModel)} ${pc.dim("│")} safety: ${s.mode}`
-    );
+  if (style === "minimal") {
+    // No banner/status line for minimal
     return;
   }
 
   console.log(
     "  " +
-      pc.cyan("💧 ") +
       pc.bold("splash") +
       pc.dim("  provider=") + pc.white(pConf.default) +
       pc.dim("  model=") + pc.white(pConf.defaultModel) +
@@ -1011,16 +1363,8 @@ async function runOneShot(alpclaw: AlpClaw, description: string, persona?: strin
   let lastTool = "";
 
   const updateSpinner = (message: string) => {
-    if (style === "minimal" || style === "openclaw") return; // Silent execution
+    if (style === "minimal") return; // Silent execution
     
-    if (style === "hermes") {
-      if (currentPhase && currentPhase !== message) {
-        console.log(`${pc.gray(`[${currentPhase}]`)} done`);
-      }
-      currentPhase = message;
-      console.log(`${pc.gray(`[${currentPhase}]`)} executing...`);
-      return;
-    }
 
     // Default Splash style
     if (currentPhase && currentPhase !== message) {
@@ -1031,11 +1375,7 @@ async function runOneShot(alpclaw: AlpClaw, description: string, persona?: strin
     s.start(pc.blue(message));
   };
 
-  if (style === "splash") {
     p.log.step(pc.bold(description));
-  } else if (style === "hermes") {
-    console.log(`${pc.cyan("❯")} ${description}`);
-  }
 
   const agent = alpclaw.createAgent({
     systemPersona: persona,
@@ -1043,12 +1383,8 @@ async function runOneShot(alpclaw: AlpClaw, description: string, persona?: strin
       updateSpinner(PHASE_LABELS[phase] || phase);
     },
     onToolCall: (toolName: string, args: Record<string, unknown>) => {
-      if (style === "minimal" || style === "openclaw") return;
+      if (style === "minimal") return;
       
-      if (style === "hermes") {
-        console.log(`${pc.gray(`[tool]`)} ${toolName}...`);
-        return;
-      }
       
       // Default Splash style
       s.message(`${pc.magenta("⚡")} ${pc.bold(toolName)} ${pc.dim(JSON.stringify(args).slice(0, 60))}`);
@@ -1076,17 +1412,15 @@ async function runOneShot(alpclaw: AlpClaw, description: string, persona?: strin
 
   const result = await agent.run(description);
 
-  if (style === "splash" && currentPhase) {
+  if (currentPhase) {
     s.stop(pc.green(`✓ ${currentPhase}`));
-  } else if (style === "hermes" && currentPhase) {
-    console.log(`${pc.gray(`[${currentPhase}]`)} done`);
   }
 
   if (result.ok) {
     const task = result.value;
     const body = task.result?.summary ? marked.parse(task.result.summary) : "No output.";
     
-    if (style === "splash") {
+    if (style !== "minimal") {
       p.note(
         [
           `${pc.cyan("status:")} ${task.status === "completed" ? pc.green(task.status) : pc.yellow(task.status)}`,
@@ -1099,10 +1433,10 @@ async function runOneShot(alpclaw: AlpClaw, description: string, persona?: strin
       console.log(`\n${body}`);
     }
   } else {
-    if (style === "splash") {
+    if (style !== "minimal") {
       p.log.error(pc.bgRed(pc.white(" ERROR ")) + " " + result.error.message);
     } else {
-      console.error(`${pc.red("✗")} ${result.error.message}`);
+      console.error(`${pc.red("x")} ${result.error.message}`);
     }
   }
 }
