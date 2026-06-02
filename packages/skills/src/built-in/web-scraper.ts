@@ -1,9 +1,7 @@
 import type { Result, SkillManifest, SkillResult } from "@alpclaw/utils";
 import { ok, err, createError } from "@alpclaw/utils";
 import type { Skill, SkillContext } from "../skill.js";
-import { Readability } from "@mozilla/readability";
-import { JSDOM } from "jsdom";
-import TurndownService from "turndown";
+
 
 /**
  * Web scraper — fetches a URL and extracts clean Markdown content
@@ -43,6 +41,21 @@ export class WebScraperSkill implements Skill {
       if (!res.ok) return err(createError("skill", `HTTP ${res.status}: ${res.statusText}`));
 
       const html = await res.text();
+      
+      let Readability: any;
+      let JSDOM: any;
+      let TurndownService: any;
+      
+      try {
+        const readabilityModule = await import("@mozilla/readability");
+        const jsdomModule = await import("jsdom");
+        const turndownModule = await import("turndown");
+        Readability = readabilityModule.Readability;
+        JSDOM = jsdomModule.JSDOM;
+        TurndownService = turndownModule.default || turndownModule;
+      } catch (err) {
+        return { ok: false, error: createError("skill", "Web scraper dependencies not available. Run: pnpm install") };
+      }
       
       const doc = new JSDOM(html, { url });
       const reader = new Readability(doc.window.document);
