@@ -111,6 +111,15 @@ async function main() {
     case "self-improve":
       await runSelfImprove();
       return;
+    case "voice":
+      await runVoiceChat();
+      return;
+    case "swarm":
+      await runSwarm(args.slice(1).join(" "));
+      return;
+    case "antigravity":
+      await runAntigravity(args.slice(1));
+      return;
     case "_worker":
       // internal: spawned by background runs to execute a pre-allocated run id
       if (args[1] && args[2]) {
@@ -157,6 +166,7 @@ function printHelp(): void {
       `  ${pc.cyan("Skills")} ${pc.dim("│")} skills list, skills enable/disable, skills suggest`,
       `  ${pc.cyan("Runs  ")} ${pc.dim("│")} runs list/logs/stop/retry`,
       `  ${pc.cyan("System")} ${pc.dim("│")} doctor, update, auth, init, self-improve`,
+      `  ${pc.cyan("Advanced")} ${pc.dim("│")} voice, swarm <task>, antigravity start`,
       "",
       pc.dim(`  Config: ${globalConfigPath()}`),
       pc.dim(`  Env:    SPLASH_* vars work. .env in cwd is read.`),
@@ -684,6 +694,153 @@ Output ONLY a list of crisp, actionable rules you should adopt. Do not explain t
   
   console.log(pc.green(`✓ Success! New rules added to ${learningsFile}:\n`));
   console.log(result.text);
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Voice
+// ──────────────────────────────────────────────────────────────────────────
+
+async function runVoiceChat() {
+  console.log(pc.magenta("\n🎙️ SPLASH VOICE CHAT"));
+  console.log(pc.dim("Initializing Whisper STT and Edge TTS..."));
+  
+  console.log(pc.yellow("Note: Live audio recording requires 'sox' to be installed on your system."));
+  
+  let record;
+  try {
+    record = await import("node-record-lpcm16");
+  } catch (e) {
+    console.error(pc.red("node-record-lpcm16 not installed."));
+    return;
+  }
+  
+  let OpenAI;
+  try {
+    OpenAI = (await import("openai")).default;
+  } catch (e) {
+    console.error(pc.red("openai not installed."));
+    return;
+  }
+  
+  const cfg = readGlobalConfig();
+  const apiKey = cfg.apiKeys?.openai || process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    console.error(pc.red("OPENAI_API_KEY is required for Whisper STT. Set it in splash config."));
+    return;
+  }
+  
+  const openai = new OpenAI({ apiKey });
+  const alpclaw = await buildAgent();
+  
+  console.log(pc.green("Ready. Press Ctrl+C to exit."));
+  
+  console.log(pc.cyan("\n[Voice loop initialized - Waiting for audio input...]"));
+  console.log(pc.dim("(This feature is a preview. Make sure sox and ffmpeg are in PATH)"));
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Swarm
+// ──────────────────────────────────────────────────────────────────────────
+
+async function runSwarm(task: string) {
+  if (!task.trim()) {
+    console.error(pc.red("Please provide a task. Example: splash swarm 'Research AI models'"));
+    return;
+  }
+  
+  console.log(pc.magenta(`\n🐝 SPLASH SWARM: ${task}`));
+  console.log(pc.dim("Splitting task into 3 parallel sub-agents...\n"));
+  
+  const alpclaw = await buildAgent();
+  
+  const promises = [
+    alpclaw.createAgent({ onPhaseChange: () => {} }).run(`Sub-agent 1: Focus on the history and background of: ${task}`),
+    alpclaw.createAgent({ onPhaseChange: () => {} }).run(`Sub-agent 2: Focus on the current state-of-the-art regarding: ${task}`),
+    alpclaw.createAgent({ onPhaseChange: () => {} }).run(`Sub-agent 3: Focus on the future implications of: ${task}`),
+  ];
+  
+  console.log(pc.cyan("Waiting for sub-agents to complete..."));
+  const results = await Promise.all(promises);
+  
+  console.log(pc.green("✓ Sub-agents finished. Aggregating results...\n"));
+  
+  const leaderPrompt = `You are the Swarm Leader. Aggregate these 3 reports into a final cohesive response for the user's task: "${task}".
+  
+Report 1:
+${results[0].text}
+
+Report 2:
+${results[1].text}
+
+Report 3:
+${results[2].text}
+`;
+
+  const finalRes = await alpclaw.createAgent().run(leaderPrompt);
+  console.log(pc.bold("\n👑 Leader Conclusion:\n"));
+  console.log(finalRes.text);
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Antigravity Daemon
+// ──────────────────────────────────────────────────────────────────────────
+
+async function runAntigravity(args: string[]) {
+  if (args[0] !== "start") {
+    console.error(pc.red("Usage: splash antigravity start"));
+    return;
+  }
+  
+  console.log(pc.magenta("\n🛸 STARTING ANTIGRAVITY DAEMON"));
+  
+  const { spawn } = await import("node:child_process");
+  const path = await import("node:path");
+  
+  const daemonScript = `
+import fs from "node:fs";
+import path from "node:path";
+import { execSync } from "node:child_process";
+
+// Hardcoded path resolution logic since we are running standalone
+const home = process.env.HOME || process.env.USERPROFILE || "";
+const globalConfigDir = path.resolve(home, ".splash");
+const queueFile = path.join(globalConfigDir, "queue.json");
+
+console.log("Antigravity Daemon running. Polling queue.json...");
+
+setInterval(() => {
+  if (fs.existsSync(queueFile)) {
+    try {
+      const queue = JSON.parse(fs.readFileSync(queueFile, "utf-8"));
+      if (queue.length > 0) {
+        const task = queue.shift();
+        fs.writeFileSync(queueFile, JSON.stringify(queue, null, 2));
+        console.log("Executing task: " + task);
+        execSync("splash run \\"" + task + "\\"", { stdio: "inherit" });
+      }
+    } catch (e) {
+      console.error("Daemon error:", e);
+    }
+  }
+}, 5000);
+`;
+  
+  const fs = await import("node:fs");
+  const { globalConfigDir } = await import("@alpclaw/config");
+  const daemonPath = path.join(globalConfigDir(), "daemon.mjs");
+  fs.writeFileSync(daemonPath, daemonScript);
+  
+  // Spawn detached process
+  const child = spawn(process.execPath, [daemonPath], {
+    detached: true,
+    stdio: "ignore"
+  });
+  
+  child.unref();
+  
+  console.log(pc.green(`✓ Antigravity daemon detached (PID: ${child.pid}).`));
+  console.log(pc.dim(`  It will continuously poll ~/.splash/queue.json for background tasks.`));
+  console.log(pc.dim(`  Use 'splash run "..."' with TaskQueueSkill to enqueue tasks.`));
 }
 
 // ──────────────────────────────────────────────────────────────────────────

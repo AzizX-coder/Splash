@@ -23,3 +23,4 @@ export { GitHelperSkill } from "./built-in/git-helper.js";
 export { LinearTriageSkill } from "./built-in/linear-triage.js";
 export { NotionSyncSkill } from "./built-in/notion-sync.js";
 export { ConfigEditorSkill } from "./built-in/config-editor.js";
+export { TaskQueueSkill } from "./built-in/task-queue.js";

@@ -50,6 +50,7 @@ import {
   LinearTriageSkill,
   NotionSyncSkill,
   ConfigEditorSkill,
+  TaskQueueSkill,
 } from "@alpclaw/skills";
 import { createLogger } from "@alpclaw/utils";
 import { AgentLoop, type AgentLoopCallbacks } from "./agent-loop.js";
@@ -154,6 +155,7 @@ export class AlpClaw {
     this.skills.register(new LinearTriageSkill());
     this.skills.register(new NotionSyncSkill());
     this.skills.register(new ConfigEditorSkill());
+    this.skills.register(new TaskQueueSkill());
 
     // ── Safety ─────────────────────────────────────────────────────────────
     this.safety = new SafetyEngine(config.safety.mode, config.safety.blockedPatterns);
