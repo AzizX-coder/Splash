@@ -719,60 +719,56 @@ function buildAgent(): AlpClaw {
 }
 
 function printStatusLine(a: AlpClaw): void {
-  const p = a.config.providers;
+  const pConf = a.config.providers;
   const s = a.config.safety;
-  const runtime = readGlobalConfig().runtime || "foreground";
+  const cfg = readGlobalConfig();
+  const runtime = cfg.runtime || "foreground";
+  const style = cfg.cli?.style || "splash";
+
+  if (style === "hermes" || style === "minimal") {
+    // No banner/status line for minimal/hermes
+    return;
+  }
+
+  if (style === "openclaw") {
+    console.log(
+      `${pc.green("● ready")} ${pc.dim("│")} providers: 11 ${pc.dim("│")} model: ${pc.cyan(pConf.defaultModel)} ${pc.dim("│")} safety: ${s.mode}`
+    );
+    return;
+  }
+
   console.log(
     "  " +
       pc.cyan("💧 ") +
       pc.bold("splash") +
-      pc.dim("  provider=") + pc.white(p.default) +
-      pc.dim("  model=") + pc.white(p.defaultModel) +
+      pc.dim("  provider=") + pc.white(pConf.default) +
+      pc.dim("  model=") + pc.white(pConf.defaultModel) +
       pc.dim("  safety=") + pc.white(s.mode) +
       pc.dim("  runtime=") + pc.white(runtime),
   );
 }
 
-async function runOneShot(prompt: string) {
-  const alpclaw = buildAgent();
-  console.log(renderBanner({ subtitle: "Task", compact: true }));
-  printStatusLine(alpclaw);
-  await runTask(alpclaw, prompt, loadPersona());
-}
-
-async function openChat() {
-  const alpclaw = buildAgent();
-  console.log(renderBanner({ subtitle: "Chat" }));
-  printStatusLine(alpclaw);
-  p.intro(pc.bgCyan(pc.black(" 💧 SPLASH ")));
-  p.log.message(pc.dim("Type your task. `exit` quits. `/help` for commands. `/tui` for dashboard."));
-
-  while (true) {
-    const input = await p.text({
-      message: pc.cyan("you"),
-      placeholder: "e.g., scan this folder for bugs, build a fastapi app",
-      validate: (val) => (!val || val.trim().length === 0 ? "Please enter a task." : undefined),
-    });
-
-    if (p.isCancel(input)) break;
-    const text = String(input).trim();
-    if (!text || text === "exit" || text === "quit") break;
-    if (text === "/help") { printHelp(); continue; }
-    if (text === "/config") { await runConfig(["list"]); continue; }
-    if (text === "/tui") { await launchTui(); continue; }
-    if (text === "/runs") { await runRunsCmd(["list"]); continue; }
-
-    await runTask(alpclaw, text, loadPersona());
-  }
-
-  p.outro(pc.cyan("bye"));
-}
-
 async function runTask(alpclaw: AlpClaw, description: string, persona?: string): Promise<void> {
+  const cfg = readGlobalConfig();
+  const style = cfg.cli?.style || "splash";
+  
   let s = p.spinner();
   let currentPhase = "";
+  let lastTool = "";
 
   const updateSpinner = (message: string) => {
+    if (style === "minimal" || style === "openclaw") return; // Silent execution
+    
+    if (style === "hermes") {
+      if (currentPhase && currentPhase !== message) {
+        console.log(`${pc.gray(`[${currentPhase}]`)} done`);
+      }
+      currentPhase = message;
+      console.log(`${pc.gray(`[${currentPhase}]`)} executing...`);
+      return;
+    }
+
+    // Default Splash style
     if (currentPhase && currentPhase !== message) {
       s.stop(pc.green(`✓ ${currentPhase}`));
       s = p.spinner();
@@ -781,7 +777,11 @@ async function runTask(alpclaw: AlpClaw, description: string, persona?: string):
     s.start(pc.blue(message));
   };
 
-  p.log.step(pc.bold(description));
+  if (style === "splash") {
+    p.log.step(pc.bold(description));
+  } else if (style === "hermes") {
+    console.log(`${pc.cyan("❯")} ${description}`);
+  }
 
   const agent = alpclaw.createAgent({
     systemPersona: persona,
@@ -789,40 +789,67 @@ async function runTask(alpclaw: AlpClaw, description: string, persona?: string):
       updateSpinner(PHASE_LABELS[phase] || phase);
     },
     onToolCall: (toolName: string, args: Record<string, unknown>) => {
+      if (style === "minimal" || style === "openclaw") return;
+      
+      if (style === "hermes") {
+        console.log(`${pc.gray(`[tool]`)} ${toolName}...`);
+        return;
+      }
+      
+      // Default Splash style
       s.message(`${pc.magenta("⚡")} ${pc.bold(toolName)} ${pc.dim(JSON.stringify(args).slice(0, 60))}`);
     },
     onStepComplete: () => {},
     onError: (error: string, phase: AgentPhase) => {
-      p.log.error(pc.red(`[${phase}] ${error}`));
+      if (style === "splash") {
+        p.log.error(pc.red(`[${phase}] ${error}`));
+      } else {
+        console.error(`${pc.red(`[error:${phase}]`)} ${error}`);
+      }
     },
     onConfirmationRequired: async (action: string, risk: string): Promise<boolean> => {
-      s.stop("Safety engine paused execution.");
+      if (style === "splash") s.stop("Safety engine paused execution.");
       const allowed = await p.confirm({
         message: `${pc.bgYellow(pc.black(" WARN "))} ${pc.bold(action)} (risk: ${pc.red(risk)}). Allow?`,
       });
-      s = p.spinner();
-      s.start("Resuming...");
+      if (style === "splash") {
+        s = p.spinner();
+        s.start("Resuming...");
+      }
       return !!allowed && !p.isCancel(allowed);
     },
   });
 
   const result = await agent.run(description);
 
-  if (currentPhase) s.stop(pc.green(`✓ ${currentPhase}`));
+  if (style === "splash" && currentPhase) {
+    s.stop(pc.green(`✓ ${currentPhase}`));
+  } else if (style === "hermes" && currentPhase) {
+    console.log(`${pc.gray(`[${currentPhase}]`)} done`);
+  }
 
   if (result.ok) {
     const task = result.value;
     const body = task.result?.summary ? marked.parse(task.result.summary) : "No output.";
-    p.note(
-      [
-        `${pc.cyan("status:")} ${task.status === "completed" ? pc.green(task.status) : pc.yellow(task.status)}`,
-        `${pc.cyan("steps:")}  ${task.steps.length}`,
-        `\n${body}`,
-      ].join("\n"),
-      "Result",
-    );
+    
+    if (style === "splash") {
+      p.note(
+        [
+          `${pc.cyan("status:")} ${task.status === "completed" ? pc.green(task.status) : pc.yellow(task.status)}`,
+          `${pc.cyan("steps:")}  ${task.steps.length}`,
+          `\n${body}`,
+        ].join("\n"),
+        "Result",
+      );
+    } else {
+      console.log(`\n${body}`);
+    }
   } else {
-    p.log.error(pc.bgRed(pc.white(" ERROR ")) + " " + result.error.message);
+    if (style === "splash") {
+      p.log.error(pc.bgRed(pc.white(" ERROR ")) + " " + result.error.message);
+    } else {
+      console.error(`${pc.red("✗")} ${result.error.message}`);
+    }
   }
 }
 

@@ -29,12 +29,26 @@ export class ClaudeProvider implements ModelProvider {
     return this.apiKey.length > 0;
   }
 
-  listModels(): string[] {
-    return [
-      "claude-opus-4-20250514",
-      "claude-sonnet-4-20250514",
-      "claude-haiku-4-20250514",
-    ];
+  async healthcheck(): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/v1/models`, {
+        headers: {
+          "x-api-key": this.apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async listModels(): Promise<{ id: string; isFree: boolean; contextTokens?: number }[]> {
+    return Promise.resolve([
+      { id: "claude-opus-4-20250514", isFree: false },
+      { id: "claude-sonnet-4-20250514", isFree: false },
+      { id: "claude-haiku-4-20250514", isFree: false },
+    ]);
   }
 
   async complete(request: CompletionRequest): Promise<Result<CompletionResponse>> {

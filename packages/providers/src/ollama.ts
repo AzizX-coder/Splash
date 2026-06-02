@@ -48,8 +48,23 @@ export class OllamaProvider implements ModelProvider {
     return true; // We assume true but actually check during listModels or complete
   }
 
-  listModels(): string[] {
-    return ["llama3", "phi3", "mistral", "qwen2", "codestral"];
+  async healthcheck(): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/tags`);
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async listModels(): Promise<{ id: string; isFree: boolean; contextTokens?: number }[]> {
+    return Promise.resolve([
+      { id: "llama3", isFree: true },
+      { id: "phi3", isFree: true },
+      { id: "mistral", isFree: true },
+      { id: "qwen2", isFree: true },
+      { id: "codestral", isFree: true },
+    ]);
   }
 
   static capabilities(): ProviderCapabilities {

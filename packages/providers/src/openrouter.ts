@@ -19,18 +19,19 @@ export class OpenRouterProvider extends OpenAIProvider {
     });
   }
 
-  override listModels(): string[] {
-    return [
-      "moonshotai/kimi-k2",
-      "moonshotai/kimi-k2-0905",
-      "qwen/qwen-2.5-72b-instruct",
-      "qwen/qwen-2.5-coder-32b-instruct",
-      "deepseek/deepseek-chat",
-      "zhipu/glm-4",
-      "anthropic/claude-3.5-sonnet",
-      "openai/gpt-4o",
-      "x-ai/grok-beta",
-    ];
+  override async listModels(): Promise<{ id: string; isFree: boolean; contextTokens?: number }[]> {
+    try {
+      const response = await fetch("https://openrouter.ai/api/v1/models");
+      if (!response.ok) return [];
+      const data = (await response.json()) as any;
+      return (data.data || []).map((model: any) => ({
+        id: model.id,
+        isFree: model.pricing?.prompt === "0",
+        contextTokens: model.context_length,
+      }));
+    } catch {
+      return [];
+    }
   }
 
   static override capabilities(): ProviderCapabilities {

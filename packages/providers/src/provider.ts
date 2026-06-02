@@ -14,11 +14,14 @@ export interface ModelProvider {
   /** Check if the provider is configured and available. */
   isAvailable(): boolean;
 
+  /** Healthcheck to ping the provider. */
+  healthcheck(): Promise<boolean>;
+
   /** Send a completion request and get a response. */
   complete(request: CompletionRequest): Promise<Result<CompletionResponse>>;
 
   /** List available models from this provider. */
-  listModels(): string[];
+  listModels(): Promise<{ id: string; isFree: boolean; contextTokens?: number }[]>;
 }
 
 /**

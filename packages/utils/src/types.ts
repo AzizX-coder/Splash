@@ -104,7 +104,21 @@ export interface TaskResult {
 
 // ─── Provider Types ──────────────────────────────────────────────────────────
 
-export type ProviderName = "claude" | "openai" | "gemini" | "deepseek" | "local" | string;
+export type ProviderName =
+  | "claude"
+  | "openai"
+  | "gemini"
+  | "deepseek"
+  | "local"
+  | "nous"
+  | "groq"
+  | "mistral"
+  | "cerebras"
+  | "cohere"
+  | "nvidia"
+  | "openrouter"
+  | "ollama"
+  | string;
 
 export interface Message {
   role: "system" | "user" | "assistant" | "tool";

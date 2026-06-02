@@ -125,19 +125,15 @@ export function renderBanner(opts?: { subtitle?: string; compact?: boolean }): s
   };
 
   const logo = [
-    "   ███████╗██████╗ ██╗      █████╗ ███████╗██╗  ██╗",
-    "   ██╔════╝██╔══██╗██║     ██╔══██╗██╔════╝██║  ██║",
-    "   ███████╗██████╔╝██║     ███████║███████╗███████║",
-    "   ╚════██║██╔═══╝ ██║     ██╔══██║╚════██║██╔══██║",
-    "   ███████║██║     ███████╗██║  ██║███████║██║  ██║",
-    "   ╚══════╝╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝",
+    "   💧   ",
+    " ≈≈≈≈≈≈ ",
+    " SPLASH "
   ];
 
-  const wave =
-    "≈≈≈   ~  ∿   ≈    ∿  ~   ≈≈  ∿  ~  ≈  ∿   ~ ≈≈≈";
+  const wave = "≈≈≈  ∿  ≈  ∿  ≈≈  ∿  ≈  ∿  ≈≈≈";
 
   const terminalWidth = process.stdout.columns || 80;
-  const logoWidth = 53;
+  const logoWidth = 8;
   const leftPadCount = Math.max(0, Math.floor((terminalWidth - logoWidth) / 2));
   const pad = " ".repeat(leftPadCount);
 

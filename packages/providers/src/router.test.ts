@@ -8,7 +8,8 @@ function mockProvider(name: string, available: boolean = true): ModelProvider {
   return {
     name,
     isAvailable: () => available,
-    listModels: () => [`${name}-v1`],
+    healthcheck: async () => available,
+    listModels: async () => [{ id: `${name}-v1`, isFree: false }],
     complete: async (): Promise<Result<CompletionResponse>> =>
       ok({
         content: `Response from ${name}`,

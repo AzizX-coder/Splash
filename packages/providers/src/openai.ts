@@ -35,11 +35,30 @@ export class OpenAIProvider implements ModelProvider {
     return this.apiKey.length > 0;
   }
 
-  listModels(): string[] {
-    if (this.name === "deepseek") {
-      return ["deepseek-chat", "deepseek-reasoner"];
+  async healthcheck(): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/models`, {
+        headers: { Authorization: `Bearer ${this.apiKey}` },
+      });
+      return response.ok;
+    } catch {
+      return false;
     }
-    return ["gpt-4o", "gpt-4o-mini", "o3", "o4-mini"];
+  }
+
+  async listModels(): Promise<{ id: string; isFree: boolean; contextTokens?: number }[]> {
+    if (this.name === "deepseek") {
+      return Promise.resolve([
+        { id: "deepseek-chat", isFree: false },
+        { id: "deepseek-reasoner", isFree: false },
+      ]);
+    }
+    return Promise.resolve([
+      { id: "gpt-4o", isFree: false },
+      { id: "gpt-4o-mini", isFree: false },
+      { id: "o3", isFree: false },
+      { id: "o4-mini", isFree: false },
+    ]);
   }
 
   async complete(request: CompletionRequest): Promise<Result<CompletionResponse>> {

@@ -30,8 +30,22 @@ export class GeminiProvider implements ModelProvider {
     return this.apiKey.length > 0;
   }
 
-  listModels(): string[] {
-    return ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"];
+  async healthcheck(): Promise<boolean> {
+    try {
+      const url = `${this.baseUrl}/models?key=${this.apiKey}`;
+      const response = await fetch(url);
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async listModels(): Promise<{ id: string; isFree: boolean; contextTokens?: number }[]> {
+    return Promise.resolve([
+      { id: "gemini-2.5-pro", isFree: false },
+      { id: "gemini-2.5-flash", isFree: false },
+      { id: "gemini-2.0-flash", isFree: false },
+    ]);
   }
 
   async complete(request: CompletionRequest): Promise<Result<CompletionResponse>> {

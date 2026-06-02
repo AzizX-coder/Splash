@@ -18,6 +18,13 @@ export interface GlobalConfigShape {
   preset?: "fast" | "balanced" | "safe";
   apiKeys?: Record<string, string>;
   bots?: Record<string, Record<string, string>>;
+  cli?: {
+    style?: "splash" | "hermes" | "openclaw" | "minimal";
+    showThinking?: boolean;
+    showToolUse?: boolean;
+    timestamp?: boolean;
+    colors?: boolean;
+  };
 }
 
 export function globalConfigDir(): string {
