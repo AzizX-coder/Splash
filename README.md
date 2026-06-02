@@ -44,6 +44,10 @@ splash init                 # pick provider, paste key, pick model, pick safety
 splash "summarize this folder"
 splash "build a FastAPI todo service" --background
 splash tui                  # live dashboard
+# 3. Advanced Features
+splash voice                # interactive STT/TTS loop
+splash swarm "task"         # parallel sub-agents
+splash antigravity start    # spawn background daemon
 ```
 
 No `pnpm dev`. No per-project `.env`. Just `splash`.
@@ -62,8 +66,10 @@ No `pnpm dev`. No per-project `.env`. Just `splash`.
 | **Platform Bots** | Telegram, Slack, WhatsApp (Twilio), Messenger (Meta), Discord — shared agent behind all. |
 | **Safety Engine** | Pattern-based policy with `strict` / `standard` / `permissive` modes, per-action confirmations. |
 | **Persistent Memory** | File-backed memory of successful tool strategies across runs. |
-| **18 Built-in Skills** | repo-analysis, code-edit, test-runner, debugger, pr-creator, docs-generator, web-scraper, data-analyst, sql-builder, python-runner, shell-runner, and more. |
-| **6 Connectors** | filesystem, terminal, database, http, browser, git — each with tight allowlists. |
+| **18 Built-in Skills** | repo-analysis, code-edit, task-queue, test-runner, debugger, pr-creator, docs-generator, web-scraper, data-analyst, sql-builder, python-runner, shell-runner, and more. |
+| **Swarm & Voice** | `splash swarm` spawns parallel research agents. `splash voice` drops you into a Whisper STT / Edge TTS audio chat loop. |
+| **Self-Improvement**| `splash self-improve` scans recent logs and permanently alters agent behavior by writing to `~/.splash/learnings.md`. |
+| **Antigravity Daemon**| `splash antigravity start` detaches a daemon to poll `~/.splash/queue.json` for autonomous execution of queued tasks. |
 
 ---
 
@@ -78,6 +84,10 @@ No `pnpm dev`. No per-project `.env`. Just `splash`.
 | `splash "do X" --background` | Detached run; returns an id |
 | `splash init` | 30-second wizard → writes `~/.splash/config.json` |
 | `splash tui` | Open the live TUI dashboard |
+| `splash voice` | Interactive continuous audio STT/TTS loop |
+| `splash swarm <task>` | Spawns 3 parallel sub-agents to synthesize an answer |
+| `splash antigravity start` | Starts background polling daemon for `TaskQueueSkill` |
+| `splash self-improve` | Analyze recent runs to permanently extract behavior rules |
 | `splash help` | Show full help |
 
 ### Runs
