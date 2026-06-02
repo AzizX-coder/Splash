@@ -24,6 +24,7 @@
       "@alpclaw/providers":  ["./packages/providers/src/index.ts"],
       "@alpclaw/connectors": ["./packages/connectors/src/index.ts"],
       "@alpclaw/skills":     ["./packages/skills/src/index.ts"],
+      "@alpclaw/tools":      ["./packages/tools/src/index.ts"],
       "@alpclaw/core":       ["./packages/core/src/index.ts"]
     }
   },

@@ -110,7 +110,7 @@ async function main() {
     "version", "help", "init", "setup", "config", "chat", "telegram", "slack", 
     "whatsapp", "messenger", "discord", "runs", "tui", "dashboard", "self-improve", 
     "providers", "skills", "memory", "maintenance", "voice", "swarm", "antigravity", 
-    "run", "doctor"
+    "run", "doctor", "browser"
   ];
 
   if (!KNOWN_COMMANDS.includes(cmd)) {
@@ -178,6 +178,9 @@ async function main() {
       return;
     case "skills":
       await runSkills(args.slice(1));
+      return;
+    case "browser":
+      await runBrowser(args.slice(1));
       return;
     case "memory":
       await runMemory(args.slice(1));
@@ -1165,21 +1168,87 @@ async function runSkills(args: string[]): Promise<void> {
   const sub = args[0] || "list";
 
   if (sub === "list") {
-    const alpclaw = await buildAgent();
-    const skills = alpclaw.skills.list();
-    console.log(pc.bold(`\n  Registered Skills (${skills.length})\n`));
-    for (const skill of skills) {
-      const tags = skill.tags?.join(", ") || "";
-      console.log(
-        `  ${pc.cyan(skill.name.padEnd(20))} ${pc.dim(tags)}`,
-      );
+    // Read skills without building the agent (no API keys needed)
+    let count = 0;
+    console.log(pc.bold(`\n  Registered Skills\n`));
+    
+    try {
+      const skillsPkg = await import("@alpclaw/skills");
+      for (const [name, ExportedClass] of Object.entries(skillsPkg)) {
+        if (typeof ExportedClass === "function" && name.endsWith("Skill")) {
+          try {
+            const instance = new (ExportedClass as any)();
+            if (instance.manifest) {
+              const tags = instance.manifest.tags?.join(", ") || "";
+              console.log(`  ${pc.cyan(instance.manifest.name.padEnd(20))} ${pc.dim(tags)}`);
+              count++;
+            }
+          } catch {}
+        }
+      }
+      
+      const toolsPkg = await import("@alpclaw/tools");
+      for (const [name, ExportedClass] of Object.entries(toolsPkg)) {
+        if (typeof ExportedClass === "function" && name.endsWith("Tool")) {
+          try {
+            const instance = new (ExportedClass as any)();
+            if (instance.manifest) {
+              const tags = instance.manifest.tags?.join(", ") || "";
+              console.log(`  ${pc.cyan(instance.manifest.name.padEnd(20))} ${pc.dim(tags)}`);
+              count++;
+            }
+          } catch {}
+        }
+      }
+    } catch (e) {
+      console.error(pc.red("  Failed to load skills list"));
     }
-    console.log();
+    console.log(pc.dim(`\n  Total: ${count}\n`));
     return;
   }
 
   console.error(pc.red(`Unknown subcommand: skills ${sub}`));
   console.log(pc.dim("  Available: list"));
+}
+
+async function runBrowser(args: string[]): Promise<void> {
+  const sub = args[0];
+  const url = args[1];
+  const pathArg = args[2];
+
+  if (!sub || !url) {
+    console.error(pc.red("Usage: splash browser <open|screenshot> <url> [path]"));
+    return;
+  }
+
+  let playwright;
+  try {
+    playwright = await import("playwright");
+  } catch {
+    console.error(pc.red("[ERR] Install playwright or puppeteer to use browser tools."));
+    return;
+  }
+
+  try {
+    const browser = await playwright.chromium.launch({ headless: true });
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: "networkidle" });
+    
+    if (sub === "open") {
+      const content = await page.content();
+      console.log(`[OK] Snapshot size: ${content.length} bytes`);
+    } else if (sub === "screenshot") {
+      const sp = pathArg || "screenshot.png";
+      await page.screenshot({ path: sp, fullPage: true });
+      console.log(`[OK] Screenshot saved to ${sp}`);
+    } else {
+      console.error(pc.red(`[ERR] Unknown browser command: ${sub}`));
+    }
+    
+    await browser.close();
+  } catch (e: any) {
+    console.error(pc.red(`[ERR] Browser failed: ${e.message}`));
+  }
 }
 
 // ──────────────────────────────────────────────────────────────────────────

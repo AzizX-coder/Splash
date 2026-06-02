@@ -54,6 +54,15 @@ import {
   ProjectGeneratorSkill,
   DocumentGeneratorSkill,
 } from "@alpclaw/skills";
+import {
+  FsTool,
+  ShellTool,
+  WebTool,
+  BrowserTool,
+  MemoryTool,
+  DocTool,
+  CodeTool
+} from "@alpclaw/tools";
 import { createLogger } from "@alpclaw/utils";
 import { AgentLoop, type AgentLoopCallbacks } from "./agent-loop.js";
 
@@ -160,6 +169,15 @@ export class AlpClaw {
     this.skills.register(new TaskQueueSkill());
     this.skills.register(new ProjectGeneratorSkill());
     this.skills.register(new DocumentGeneratorSkill());
+    
+    // Tools
+    this.skills.register(new FsTool());
+    this.skills.register(new ShellTool());
+    this.skills.register(new WebTool());
+    this.skills.register(new BrowserTool());
+    this.skills.register(new MemoryTool());
+    this.skills.register(new DocTool());
+    this.skills.register(new CodeTool());
 
     // ── Safety ─────────────────────────────────────────────────────────────
     this.safety = new SafetyEngine(config.safety.mode, config.safety.blockedPatterns);
