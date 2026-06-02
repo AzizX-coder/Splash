@@ -630,24 +630,35 @@ async function runBot(name: string) {
   }
 
   const alpclawHome = process.env.SPLASH_HOME || process.env.ALPCLAW_HOME || process.cwd();
-  const botPath = path.resolve(alpclawHome, "bots", spec.file);
-  if (!fs.existsSync(botPath)) {
-    console.error(pc.red(`Bot entrypoint not found at ${botPath}`));
+  
+  // Prefer the bundled JS version in dist/ if available (for production)
+  const distBotPath = path.resolve(alpclawHome, "dist", "bots", spec.file.replace(".ts", ".js"));
+  const srcBotPath = path.resolve(alpclawHome, "bots", spec.file);
+  
+  let executeCmd = "";
+  let executeArgs: string[] = [];
+
+  if (fs.existsSync(distBotPath)) {
+    executeCmd = process.execPath; // node
+    executeArgs = [distBotPath];
+  } else if (fs.existsSync(srcBotPath)) {
+    const tsxName = process.platform === "win32" ? "tsx.cmd" : "tsx";
+    const tsxCandidates = [
+      path.resolve(alpclawHome, "node_modules", ".bin", tsxName),
+      path.resolve(alpclawHome, "..", "..", "node_modules", ".bin", tsxName),
+      tsxName,
+    ];
+    executeCmd = tsxCandidates.find((p) => fs.existsSync(p)) || tsxName;
+    executeArgs = [srcBotPath];
+  } else {
+    console.error(pc.red(`Bot entrypoint not found for ${name}`));
     process.exit(1);
   }
 
   console.log(renderBanner({ subtitle: `${spec.label} bridge` }));
   console.log(pc.dim(`Starting ${name}...`));
 
-  const tsxName = process.platform === "win32" ? "tsx.cmd" : "tsx";
-  const tsxCandidates = [
-    path.resolve(alpclawHome, "node_modules", ".bin", tsxName),
-    path.resolve(alpclawHome, "..", "..", "node_modules", ".bin", tsxName),
-    tsxName,
-  ];
-  const tsxBin = tsxCandidates.find((p) => fs.existsSync(p)) || tsxName;
-
-  const result = spawnSync(tsxBin, [botPath], { stdio: "inherit", env });
+  const result = spawnSync(executeCmd, executeArgs, { stdio: "inherit", env });
   process.exit(result.status ?? 0);
 }
 

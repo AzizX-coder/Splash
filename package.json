@@ -1,6 +1,6 @@
 {
   "name": "splash-agent",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Splash — Autonomous Agent Platform: CLI + multi-provider agent loop + TUI dashboard + platform bots",
   "author": "Splash Contributors",
   "license": "MIT",
@@ -39,20 +39,15 @@
   },
   "files": [
     "bin/",
-    "packages/",
-    "bots/",
-    "examples/cli.ts",
-    "examples/demo-standalone.ts",
-    "examples/package.json",
+    "dist/",
     "templates/",
-    "tsconfig.json",
-    "pnpm-workspace.yaml",
     "README.md",
     "LICENSE",
     ".env.example"
   ],
   "scripts": {
     "build": "pnpm -r run build",
+    "build:cli": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -60,7 +55,7 @@
     "format": "prettier --write \"packages/**/*.ts\" \"examples/**/*.ts\"",
     "clean": "pnpm -r run clean",
     "dev": "tsx examples/cli.ts",
-    "prepare": "pnpm run build",
+    "prepare": "pnpm run build && pnpm run build:cli",
     "prepublishOnly": "pnpm run typecheck && pnpm run lint && pnpm run test"
   },
   "devDependencies": {
@@ -69,6 +64,7 @@
     "@types/react": "^18.3.12",
     "eslint": "^9.0.0",
     "prettier": "^3.3.0",
+    "tsup": "^8.5.1",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
