@@ -1,6 +1,6 @@
 {
   "name": "splash-agent",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Splash — Autonomous Agent Platform: CLI + multi-provider agent loop + TUI dashboard + platform bots",
   "author": "Splash Contributors",
   "license": "MIT",
@@ -71,6 +71,7 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.2.0",
+    "dotenv": "^16.4.5",
     "ink": "^5.0.1",
     "marked": "^15.0.12",
     "marked-terminal": "^7.3.0",
