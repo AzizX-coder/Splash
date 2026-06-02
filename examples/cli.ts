@@ -734,37 +734,166 @@ async function launchTui(_focusId?: string): Promise<void> {
 
 async function checkFastPath(prompt: string): Promise<boolean> {
   const lowerPrompt = prompt.toLowerCase().trim();
-  
-  const createMatch = lowerPrompt.match(/^(?:(?:run\s+)?(?:create|make)\s+file)\s+(.+)$/);
-  if (createMatch) {
+
+  // --- helpers ---
+  const resolvePath = (raw: string): string => {
+    const p = raw.trim().replace(/^["']|["']$/g, "");
+    if (/^[a-z]:[/\\]/i.test(p)) return path.resolve(p);
+    return path.resolve(process.cwd(), p);
+  };
+
+  const isPathLike = (s: string) =>
+    /^(?:[a-z]:)?[\\/]/.test(s) || s.includes("/") || s.includes("\\");
+
+  // 1) Create file — catch "create [a] [python] file [named|called] snake.py"
+  //                      "make a python file snake.py"
+  //                      "create there python code for neon snake"
+  const createAlias = lowerPrompt.match(
+    /^(?:(?:run\s+)?(?:create|make|new|write|generate)\s+(?:a\s+)?(?:python\s+)?(?:file|code|script)?\.?\s*(?:named|called)?\.?\s*)([\w\-./\\]+(?:\.[a-z0-9]+)?(?:\s+\S+)*)$/i
+  );
+  if (createAlias) {
+    const tail = createAlias[1].trim();
+    // If tail itself contains spaces, take the first non-space token as filename
+    const candidate = tail.split(/\s+/).find((t) => /^\w|[\w\-./\\]/.test(t)) || tail;
+    const fp = resolvePath(candidate);
     try {
-      fs.writeFileSync(path.resolve(process.cwd(), createMatch[1]!), "");
-      console.log(`[OK] file created: ${createMatch[1]}`);
+      fs.mkdirSync(path.dirname(fp), { recursive: true });
+      fs.writeFileSync(fp, "");
+      console.log(`[OK] created ${fp}`);
+      return true;
     } catch (e: any) {
       console.log(`[ERR] failed to create file: ${e.message}`);
+      return true;
     }
-    return true;
   }
 
-  const runMatch = lowerPrompt.match(/^(?:(?:run\s+)?command|execute)\s+(.+)$/);
+  // 2) Create file with content (e.g. "create python code for neon snake")
+  //    → generate a minimal Python script for the topic
+  if (/^(?:create|make|write|generate)\s+(?:a\s+)?(?:python|js|ts|html|css|json|md)\b/i.test(lowerPrompt)) {
+    const langMatch = lowerPrompt.match(/^(?:create|make|write|generate)\s+(?:a\s+)?(python|js|ts|html|css|json|md)/i);
+    const lang = (langMatch?.[1] || "py").trim();
+    let ext = lang;
+    if (lang === "js") ext = "js";
+    if (lang === "ts") ext = "ts";
+    const safeName = prompt
+      .replace(/^(?:create|make|write|generate)\s+(?:a\s+)?(?:python|js|ts|html|css|json|md)\s*/i, "")
+      .split(/\s+/)
+      .slice(0, 3)
+      .join("_")
+      .replace(/[^a-z0-9_\-]/gi, "");
+    const fileName = safeName || `script.${ext}`;
+    const fp = resolvePath(fileName.endsWith(`.${ext}`) ? fileName : `${fileName}.${ext}`);
+    let content = "";
+    if (lang === "python") {
+      content = `# ${path.basename(fp)}\nprint("Hello from Splash")\n`;
+    } else if (lang === "html") {
+      content = `<!DOCTYPE html>\n<html>\n<body>\n  <h1>Hello from Splash</h1>\n</body>\n</html>\n`;
+    } else {
+      content = `// ${path.basename(fp)}\nconsole.log("Hello from Splash");\n`;
+    }
+    try {
+      fs.mkdirSync(path.dirname(fp), { recursive: true });
+      fs.writeFileSync(fp, content);
+      console.log(`[OK] created ${fp}`);
+      return true;
+    } catch (e: any) {
+      console.log(`[ERR] failed to create file: ${e.message}`);
+      return true;
+    }
+  }
+
+  // 3) List folders/files in a directory
+  const listAlias = lowerPrompt.match(
+    /^(?:list|ls|dir|show)\s+(?:all\s+)?(?:folders|directories|files|subfolders)?\.?\s*(?:in|of|for)?\.?\s*([\w\-./\\]+)?$/
+  );
+  if (listAlias && /(?:folders|files|list|ls|dir|show)/.test(lowerPrompt)) {
+    const target = listAlias[1]
+      ? resolvePath(listAlias[1].trim())
+      : process.cwd();
+    try {
+      const entries = fs.readdirSync(target, { withFileTypes: true });
+      const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
+      const files = entries.filter((e) => e.isFile()).map((e) => e.name);
+      console.log(`[OK] ${target} — ${dirs.length} folder(s), ${files.length} file(s)`);
+      for (const d of dirs) console.log(`  [DIR]  ${d}`);
+      for (const f of files) console.log(`  [FILE] ${f}`);
+      return true;
+    } catch (e: any) {
+      console.log(`[ERR] failed to list directory: ${e.message}`);
+      return true;
+    }
+  }
+
+  // 4) "go to <path> and [do simple thing]"
+  const goToMatch = lowerPrompt.match(/^(?:go\s+to|open|cd)\s+(.+?)(?:\s+and\s+(.+))?$/);
+  if (goToMatch) {
+    const dir = goToMatch[1].trim();
+    const rest = (goToMatch[2] || "").trim();
+    if (/^(list|ls|show)\b/i.test(rest) || rest === "") {
+      const target = resolvePath(dir);
+      try {
+        const entries = fs.readdirSync(target, { withFileTypes: true });
+        const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
+        console.log(`[OK] ${target} — ${dirs.length} folder(s)`);
+        for (const d of dirs) console.log(`  ${d}`);
+        return true;
+      } catch (e: any) {
+        console.log(`[ERR] failed to list directory: ${e.message}`);
+        return true;
+      }
+    }
+    // fall through for non-simple rest
+  }
+
+  // 5) Write "write X to file Y"
+  const writeToMatch = lowerPrompt.match(/^(?:write|put|save)\s+(.+?)\s+to\s+(?:file\s+)?(.+)$/);
+  if (writeToMatch) {
+    const content = writeToMatch[1];
+    const filePath = writeToMatch[2];
+    if (isPathLike(filePath) || /\.\w{1,4}$/.test(filePath.trim())) {
+      try {
+        const fp = resolvePath(filePath);
+        fs.mkdirSync(path.dirname(fp), { recursive: true });
+        fs.writeFileSync(fp, content);
+        console.log(`[OK] wrote ${content.length} chars to ${fp}`);
+        return true;
+      } catch (e: any) {
+        console.log(`[ERR] failed to write file: ${e.message}`);
+        return true;
+      }
+    }
+  }
+
+  // 6) Read file "read file X" / "open file X"
+  const readAlias = lowerPrompt.match(/^(?:read|open|cat|show|get)\s+(?:file\s+)?(.+)$/);
+  if (readAlias) {
+    const candidate = readAlias[1].trim();
+    if (isPathLike(candidate) || /^[\w\-./\\]+$/.test(candidate)) {
+      const fp = resolvePath(candidate);
+      if (fs.existsSync(fp)) {
+        try {
+          const txt = fs.readFileSync(fp, "utf-8");
+          console.log(txt);
+          return true;
+        } catch (e: any) {
+          console.log(`[ERR] failed to read file: ${e.message}`);
+          return true;
+        }
+      }
+    }
+  }
+
+  // 7) Shell command
+  const runMatch = lowerPrompt.match(/^(?:(?:run\s+)?(?:command|execute|run|shell))\s+(.+)$/);
   if (runMatch) {
     try {
-      spawnSync(runMatch[1]!, { shell: true, stdio: "inherit" });
+      spawnSync(runMatch[1]!, { shell: true, stdio: "inherit", timeout: 30000 });
       console.log(`[OK] command executed: ${runMatch[1]}`);
+      return true;
     } catch (e: any) {
       console.log(`[ERR] command failed: ${e.message}`);
+      return true;
     }
-    return true;
-  }
-
-  const searchMatch = lowerPrompt.match(/^(?:(?:run\s+)?search(?:\s+for)?)\s+(.+)$/);
-  if (searchMatch) {
-    console.log(`[INFO] Searching for: ${searchMatch[1]}...`);
-    const { WebSearchSkill } = await import("@alpclaw/skills");
-    const skill = new WebSearchSkill();
-    const result = await skill.execute({ query: searchMatch[1] }, {} as any);
-    console.log((result as any).output || "[INFO] No results found.");
-    return true;
   }
 
   return false;

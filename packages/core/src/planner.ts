@@ -60,25 +60,67 @@ Keep the plan practical and minimal. Only include steps that are necessary.`;
 
     log.info("Creating plan", { taskDescription: taskDescription.slice(0, 100) });
 
-    const result = await this.router.route(
+    const strictSystemPrompt = `${systemPrompt}
+CRITICAL: You must respond with ONLY a JSON object matching the schema above. Do not use markdown. Do not add explanation. Do not wrap in code blocks.`;
+
+    let result = await this.router.route(
       { messages, temperature: 0.2, maxTokens: 2000 },
       { taskType: "reasoning" },
     );
 
-    if (!result.ok) return result as Result<never>;
+    // Retry once with stricter prompt on failure or empty/invalid plan
+    if (!result.ok) {
+      log.warn("Planner first attempt failed, retrying with stricter prompt");
+      result = await this.router.route(
+        { messages: [{ role: "system", content: strictSystemPrompt }, { role: "user", content: taskDescription }], temperature: 0, maxTokens: 1000 },
+        { taskType: "reasoning" },
+      );
+    }
+
+    // Degraded fallback: never return err() from planner
+    if (!result.ok) {
+      const is429 = result.error?.message?.includes("429") || result.error?.message?.includes("rate-limit");
+      const fallback: Plan = {
+        reasoning: is429
+          ? "Provider rate-limited. Use direct execution."
+          : "Planner failed after retry. Use direct execution.",
+        estimatedComplexity: "simple",
+        steps: [
+          {
+            description: is429
+              ? "Execute with a different provider or wait 60 seconds"
+              : `Execute directly: ${taskDescription}`,
+            toolOrSkill: is429 ? "provider-fallback" : "unknown",
+          },
+        ],
+      };
+      log.warn("Planner returning degraded fallback plan", { is429 });
+      return ok(fallback);
+    }
 
     try {
       const content = result.value.content.trim();
-      // Extract JSON from potential markdown code block
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
-        return err(createError("task", "Planner did not return valid JSON"));
+        const fallback: Plan = {
+          reasoning: "Planner returned non-JSON. Falling back to direct execution.",
+          estimatedComplexity: "simple",
+          steps: [{ description: `Execute directly: ${taskDescription}`, toolOrSkill: "unknown" }],
+        };
+        log.warn("Planner returning fallback plan (no JSON)");
+        return ok(fallback);
       }
 
       const plan = JSON.parse(jsonMatch[0]) as Plan;
 
       if (!plan.steps || plan.steps.length === 0) {
-        return err(createError("task", "Planner returned empty plan"));
+        const fallback: Plan = {
+          reasoning: "Planner returned empty steps. Falling back to direct execution.",
+          estimatedComplexity: "simple",
+          steps: [{ description: `Execute directly: ${taskDescription}`, toolOrSkill: "unknown" }],
+        };
+        log.warn("Planner returning fallback plan (empty steps)");
+        return ok(fallback);
       }
 
       log.info("Plan created", {
@@ -87,8 +129,14 @@ Keep the plan practical and minimal. Only include steps that are necessary.`;
       });
 
       return ok(plan);
-    } catch (cause) {
-      return err(createError("task", "Failed to parse plan", { cause }));
+    } catch {
+      const fallback: Plan = {
+        reasoning: "Planner JSON parse failed. Falling back to direct execution.",
+        estimatedComplexity: "simple",
+        steps: [{ description: `Execute directly: ${taskDescription}`, toolOrSkill: "unknown" }],
+      };
+      log.warn("Planner returning fallback plan (parse error)");
+      return ok(fallback);
     }
   }
 }
