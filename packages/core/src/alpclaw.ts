@@ -12,6 +12,15 @@ import {
   GeminiProvider,
   OllamaProvider,
   OpenRouterProvider,
+  MistralProvider,
+  GroqProvider,
+  CerebrasProvider,
+  CohereProvider,
+  NvidiaProvider,
+  TogetherProvider,
+  DeepSeekProvider,
+  GoogleProvider,
+  AnthropicProvider,
 } from "@alpclaw/providers";
 import {
   ConnectorRegistry,
@@ -83,8 +92,8 @@ export class AlpClaw {
   private constructor(config: AlpClawConfig) {
     this.config = config;
 
-    // ── Providers ──────────────────────────────────────────────────────────
-    this.router = new ProviderRouter(config.providers.default);
+    // ── Providers & Router ───────────────────────────────────────────────────
+    this.router = new ProviderRouter(config.providers.default, config.providers.fallbackOrder);
 
     const apiKeys = config.providers.apiKeys;
 
@@ -107,14 +116,31 @@ export class AlpClaw {
       );
     }
     if (apiKeys["deepseek"]) {
-      this.router.register(
-        new OpenAIProvider(apiKeys["deepseek"], {
-          name: "deepseek",
-          baseUrl: "https://api.deepseek.com/v1",
-          defaultModel: "deepseek-chat",
-        }),
-        OpenAIProvider.capabilities("deepseek"),
-      );
+      this.router.register(new DeepSeekProvider(apiKeys["deepseek"]), OpenAIProvider.capabilities("deepseek"));
+    }
+    if (apiKeys["google"]) {
+      this.router.register(new GoogleProvider(apiKeys["google"]), GeminiProvider.capabilities());
+    }
+    if (apiKeys["anthropic"]) {
+      this.router.register(new AnthropicProvider(apiKeys["anthropic"]), ClaudeProvider.capabilities());
+    }
+    if (apiKeys["mistral"]) {
+      this.router.register(new MistralProvider(apiKeys["mistral"]), OpenAIProvider.capabilities("mistral"));
+    }
+    if (apiKeys["groq"]) {
+      this.router.register(new GroqProvider(apiKeys["groq"]), OpenAIProvider.capabilities("groq"));
+    }
+    if (apiKeys["cerebras"]) {
+      this.router.register(new CerebrasProvider(apiKeys["cerebras"]), OpenAIProvider.capabilities("cerebras"));
+    }
+    if (apiKeys["cohere"]) {
+      this.router.register(new CohereProvider(apiKeys["cohere"]), OpenAIProvider.capabilities("cohere"));
+    }
+    if (apiKeys["nvidia"]) {
+      this.router.register(new NvidiaProvider(apiKeys["nvidia"]), OpenAIProvider.capabilities("nvidia"));
+    }
+    if (apiKeys["together"]) {
+      this.router.register(new TogetherProvider(apiKeys["together"]), OpenAIProvider.capabilities("together"));
     }
     if (apiKeys["openrouter"]) {
       this.router.register(

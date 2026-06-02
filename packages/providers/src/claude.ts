@@ -16,7 +16,7 @@ const log = createLogger("provider:claude");
  * Uses the Anthropic Messages API directly via fetch.
  */
 export class ClaudeProvider implements ModelProvider {
-  readonly name = "claude" as const;
+  readonly name: string = "claude";
   private apiKey: string;
   private baseUrl: string;
 

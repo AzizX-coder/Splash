@@ -20,6 +20,7 @@ export interface GlobalConfigShape {
   providers?: {
     default?: string;
     apiKeys?: Record<string, string>;
+    fallbackOrder?: string[];
   };
   runtime?: "foreground" | "background";
   tui?: boolean;

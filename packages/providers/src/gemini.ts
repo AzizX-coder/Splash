@@ -16,7 +16,7 @@ const log = createLogger("provider:gemini");
  * Uses the Gemini REST API via fetch.
  */
 export class GeminiProvider implements ModelProvider {
-  readonly name = "gemini" as const;
+  readonly name: string = "gemini";
   private apiKey: string;
   private baseUrl: string;
 

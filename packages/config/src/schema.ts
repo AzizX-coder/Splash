@@ -5,6 +5,7 @@ export const ConfigSchema = z.object({
     default: z.string().default("openrouter"),
     defaultModel: z.string().default("moonshotai/kimi-k2"),
     apiKeys: z.record(z.string(), z.string()).default({}),
+    fallbackOrder: z.array(z.string()).default([]),
   }),
   safety: z.object({
     mode: z.enum(["strict", "standard", "permissive"]).default("standard"),

@@ -8,6 +8,7 @@ import {
 } from "@alpclaw/utils";
 import type { MemoryStore } from "./store.js";
 import { EpisodicMemory } from "./episodic.js";
+import { SemanticMemory } from "./semantic.js";
 import { UserProfile } from "./profile.js";
 import { SkillMemory } from "./skill-memory.js";
 
@@ -19,6 +20,7 @@ const log = createLogger("memory");
  */
 export class MemoryManager {
   public readonly episodic = new EpisodicMemory();
+  public readonly semantic = new SemanticMemory();
   public readonly profile = new UserProfile();
   public readonly skills = new SkillMemory();
 

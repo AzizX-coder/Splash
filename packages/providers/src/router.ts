@@ -34,9 +34,11 @@ export class ProviderRouter {
   private providers = new Map<string, ModelProvider>();
   private capabilities = new Map<string, ProviderCapabilities>();
   private defaultProvider: string;
+  private fallbackOrder: string[];
 
-  constructor(defaultProvider: string = "claude") {
+  constructor(defaultProvider: string = "claude", fallbackOrder: string[] = []) {
     this.defaultProvider = defaultProvider;
+    this.fallbackOrder = fallbackOrder;
   }
 
   /** Register a provider with its capabilities. */
@@ -76,8 +78,47 @@ export class ProviderRouter {
       );
     }
 
-    log.info("Routing request", { provider: provider.name, criteria });
-    return provider.complete(request);
+    let currentProvider = provider;
+    let attempts = 0;
+    const maxAttempts = this.fallbackOrder.length + 1; // initial + fallbacks
+    let fallbackIndex = 0;
+
+    while (attempts < maxAttempts) {
+      log.info("Routing request", { provider: currentProvider.name, criteria });
+      const result = await currentProvider.complete(request);
+      
+      if (!result.ok && result.error.message.includes("429")) {
+        log.warn(`Provider ${currentProvider.name} returned 429 Rate Limit.`);
+        const fs = await import("node:fs/promises");
+        const path = await import("node:path");
+        const os = await import("node:os");
+        const errorLog = path.join(os.homedir(), ".splash", "logs", "error.jsonl");
+        await fs.mkdir(path.dirname(errorLog), { recursive: true }).catch(() => {});
+        await fs.appendFile(errorLog, JSON.stringify({ timestamp: new Date().toISOString(), provider: currentProvider.name, error: result.error.message }) + "\n", "utf-8").catch(() => {});
+
+        // Find next available fallback
+        while (fallbackIndex < this.fallbackOrder.length) {
+          const nextName = this.fallbackOrder[fallbackIndex++];
+          if (!nextName) break;
+          const nextProv = this.getProvider(nextName);
+          if (nextProv && nextProv.isAvailable()) {
+             currentProvider = nextProv;
+             break;
+          }
+        }
+        
+        if (currentProvider.name !== provider.name && fallbackIndex <= this.fallbackOrder.length) {
+          attempts++;
+          continue; // Try again with new provider
+        }
+      } else if (!result.ok) {
+        return result; // Other errors return immediately
+      }
+      
+      return result; // Success
+    }
+
+    return err(createError("provider", "All providers busy. Try again in 1 minute."));
   }
 
   /**

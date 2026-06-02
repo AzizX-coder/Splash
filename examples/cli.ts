@@ -110,7 +110,7 @@ async function main() {
     "version", "help", "init", "setup", "config", "chat", "telegram", "slack", 
     "whatsapp", "messenger", "discord", "runs", "tui", "dashboard", "self-improve", 
     "providers", "skills", "memory", "maintenance", "voice", "swarm", "antigravity", 
-    "run", "doctor", "browser"
+    "run", "doctor", "browser", "self-modify", "self-rollback"
   ];
 
   if (!KNOWN_COMMANDS.includes(cmd)) {
@@ -172,6 +172,12 @@ async function main() {
       return;
     case "self-improve":
       await runSelfImprove();
+      return;
+    case "self-modify":
+      await runSelfModify(args.slice(1));
+      return;
+    case "self-rollback":
+      await runSelfRollback(args.slice(1));
       return;
     case "providers":
       await runProviders(args.slice(1));
@@ -259,107 +265,142 @@ function printHelp(): void {
 
 async function runInit() {
   console.log(renderBanner({ subtitle: "Setup" }));
-  p.intro(pc.bgCyan(pc.black(" SPLASH INIT ")));
-  p.log.message("Pick a provider and drop in a key. You can change this any time with `splash config`.");
+  p.intro(pc.bgCyan(pc.black(" SPLASH INIT V2 ")));
+  p.log.message("Let's set up your Splash environment in 8 steps.");
 
   const existing = readGlobalConfig();
   const next: GlobalConfigShape = { ...existing };
   next.apiKeys = { ...(existing.apiKeys || {}) };
+  next.providers = { ...(existing.providers || {}) };
+  next.providers.apiKeys = next.apiKeys;
 
+  // Step 2: Primary Provider Choice
   const provider = await p.select({
-    message: "1. Default provider:",
+    message: "1. Primary Provider (Top 10):",
     options: [
-      { value: "openrouter", label: "OpenRouter — recommended, unlocks 300+ models" },
-      { value: "claude",     label: "Anthropic Claude — direct API" },
-      { value: "openai",     label: "OpenAI — GPT-4o, o3, o4-mini" },
-      { value: "gemini",     label: "Google Gemini — 2.5 Pro/Flash" },
-      { value: "deepseek",   label: "DeepSeek — R1, V3 (affordable)" },
-      { value: "ollama",     label: "Ollama — local models, no key needed" },
+      { value: "openrouter", label: "OpenRouter (Recommended — 300+ models)" },
+      { value: "openai",     label: "OpenAI (GPT-4o, o3)" },
+      { value: "anthropic",  label: "Anthropic (Claude 3.5)" },
+      { value: "google",     label: "Google Gemini" },
+      { value: "deepseek",   label: "DeepSeek (R1, V3)" },
+      { value: "mistral",    label: "Mistral" },
+      { value: "groq",       label: "Groq (Ultra-fast)" },
+      { value: "cohere",     label: "Cohere" },
+      { value: "nvidia",     label: "Nvidia NIM" },
+      { value: "together",   label: "Together AI" },
+      { value: "ollama",     label: "Ollama (Local)" },
     ],
   });
   if (p.isCancel(provider)) return abort();
 
   next.defaultProvider = provider as string;
+  next.providers.default = provider as string;
 
+  // Step 3: API Key Input
   if (provider !== "ollama") {
     const key = await p.password({ message: `2. Paste your ${provider} API key (input hidden):` });
     if (p.isCancel(key)) return abort();
-    if (key) next.apiKeys[provider as string] = key as string;
+    if (key) {
+      next.apiKeys[provider as string] = key as string;
+      next.providers.apiKeys[provider as string] = key as string;
+    }
   }
 
-  if (provider === "openrouter") {
-    const s = p.spinner();
-    s.start("Fetching live OpenRouter models...");
-    let liveModels: any[] = [];
-    try {
-      const res = await fetch("https://openrouter.ai/api/v1/models");
-      const data = await res.json() as any;
-      liveModels = data.data.sort((a: any, b: any) => a.id.localeCompare(b.id));
-    } catch (e) {
-      // Fallback
-    }
-    s.stop("Models loaded.");
+  // Step 4: Default Model Selection
+  let defaultModels: Record<string, string[]> = {
+    openrouter: ["anthropic/claude-3.5-sonnet", "deepseek/deepseek-r1", "openai/gpt-4o", "google/gemini-2.5-pro", "mistralai/mistral-large"],
+    openai: ["gpt-4o", "gpt-4o-mini", "o3-mini"],
+    anthropic: ["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"],
+    google: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"],
+    deepseek: ["deepseek-chat", "deepseek-reasoner"],
+    mistral: ["mistral-large-latest", "pixtral-large-latest", "ministral-8b-latest"],
+    groq: ["llama3-70b-8192", "mixtral-8x7b-32768"],
+    cohere: ["command-r-plus", "command-r"],
+    nvidia: ["meta/llama-3.1-70b-instruct", "meta/llama-3.1-405b-instruct"],
+    together: ["meta-llama/Llama-3-70b-chat-hf", "deepseek-ai/DeepSeek-V3"],
+    ollama: ["llama3", "mistral", "qwen2.5"],
+  };
 
-    const category = await p.select({
-      message: "3. Model Category:",
-      options: [
-        { value: "free", label: "Free — Top performing free models (DeepSeek, Llama)" },
-        { value: "paid", label: "Premium (Paid) — SOTA models (Claude 3.5, GPT-4o, Gemini Pro)" },
-        { value: "all", label: "All Live Models" },
-      ]
-    });
-    if (p.isCancel(category)) return abort();
-
-    let options: { value: string; label: string }[] = [];
-    if (liveModels.length > 0) {
-      const isFree = (m: any) => m.pricing?.prompt === "0" && m.pricing?.completion === "0";
-      const filtered = category === "free" ? liveModels.filter(isFree) 
-                     : category === "paid" ? liveModels.filter((m: any) => !isFree(m))
-                     : liveModels;
-      
-      options = filtered.slice(0, 50).map((m: any) => ({ 
-        value: m.id, 
-        label: `${m.name} ${isFree(m) ? pc.green("(Free)") : pc.yellow("(Paid)")} - ${m.context_length}k ctx` 
-      }));
-    } else {
-      // Fallback hardcoded if offline
-      options = [
-        { value: "anthropic/claude-3.5-sonnet", label: "Claude 3.5 Sonnet (Premium)" },
-        { value: "deepseek/deepseek-r1:free", label: "DeepSeek R1 (Free)" },
-      ];
-    }
-
-    const model = await p.select({
-      message: "4. Default model:",
-      options: options,
-    });
-    if (!p.isCancel(model)) next.defaultModel = model as string;
-  }
-
-  const safety = await p.select({
-    message: "4. Safety level:",
-    options: [
-      { value: "standard",   label: "Standard — confirms risky actions (recommended)" },
-      { value: "strict",     label: "Strict — confirms every action" },
-      { value: "permissive", label: "Permissive — fully autonomous" },
-    ],
+  const modelOptions = defaultModels[provider as string].map(m => ({ value: m, label: m }));
+  const model = await p.select({
+    message: "3. Default model:",
+    options: modelOptions,
   });
-  if (!p.isCancel(safety)) next.safetyMode = safety as GlobalConfigShape["safetyMode"];
+  if (p.isCancel(model)) return abort();
+  next.defaultModel = model as string;
 
-  const theme = await p.select({
-    message: "5. CLI Theme:",
+  // Step 5: Fallback Provider Selection
+  const fallback = await p.select({
+    message: "4. Fallback Provider (Used on 429 Rate Limit):",
     options: [
-      { value: "splash",     label: "Splash (Default) — Compact colored banner + minimal output" },
-      { value: "hydro",      label: "Hydro — Blue ANSI feel, compact" },
-      { value: "edge",       label: "Edge — No color, no banner, just prompt" },
-      { value: "silent",     label: "Silent — Pure prompt, silent execution" },
+      { value: "none", label: "None" },
+      { value: "openrouter", label: "OpenRouter" },
+      { value: "openai",     label: "OpenAI" },
+      { value: "anthropic",  label: "Anthropic" },
+      { value: "google",     label: "Google Gemini" },
+      { value: "deepseek",   label: "DeepSeek" },
+      { value: "groq",       label: "Groq" },
+      { value: "ollama",     label: "Ollama (Local)" },
+    ].filter(o => o.value !== provider),
+  });
+  if (p.isCancel(fallback)) return abort();
+
+  if (fallback !== "none") {
+    next.providers.fallbackOrder = [fallback as string];
+    if (fallback !== "ollama" && !next.apiKeys[fallback as string]) {
+       const fallbackKey = await p.password({ message: `Paste your ${fallback} API key:` });
+       if (!p.isCancel(fallbackKey) && fallbackKey) {
+         next.apiKeys[fallback as string] = fallbackKey as string;
+         next.providers.apiKeys[fallback as string] = fallbackKey as string;
+       }
+    }
+  } else {
+    next.providers.fallbackOrder = [];
+  }
+
+  // Step 6: Workspace Setup
+  const workspace = await p.confirm({
+    message: `5. Set up global workspace at ~/.splash?`,
+    initialValue: true,
+  });
+  if (p.isCancel(workspace)) return abort();
+
+  // Step 7: Theme Selection
+  const theme = await p.select({
+    message: "6. CLI Theme & UI Mode:",
+    options: [
+      { value: "splash",     label: "Splash — Compact banner, standard UI" },
+      { value: "tui",        label: "TUI Dashboard — Interactive full-screen view" },
+      { value: "hydro",      label: "Hydro — Blue ANSI feel" },
+      { value: "silent",     label: "Silent — Pure execution" },
     ],
   });
   if (!p.isCancel(theme)) {
     next.cli = next.cli || {};
-    next.cli.style = theme as "splash" | "hydro" | "edge" | "silent";
+    if (theme === "tui") {
+      next.tui = true;
+      next.cli.style = "splash";
+    } else {
+      next.tui = false;
+      next.cli.style = theme as "splash" | "hydro" | "silent";
+    }
   }
 
+  // Step 8: Generate Config
+  const safety = await p.select({
+    message: "7. Safety level:",
+    options: [
+      { value: "standard",   label: "Standard — confirms risky actions" },
+      { value: "strict",     label: "Strict — confirms every action" },
+      { value: "permissive", label: "Permissive — fully autonomous" },
+    ],
+  });
+  if (!p.isCancel(safety)) {
+    next.safetyMode = safety as GlobalConfigShape["safetyMode"];
+    next.safety = { mode: safety as GlobalConfigShape["safetyMode"] };
+  }
+
+  p.log.message("8. Generating configuration...");
   writeGlobalConfig(next);
   p.outro(pc.green(`[OK] Saved to ${globalConfigPath()}`));
   console.log(pc.dim(`\nTry it: ${pc.cyan("splash \"summarize this folder\"")}`));
@@ -950,6 +991,69 @@ Output ONLY a list of crisp, actionable rules you should adopt. Do not explain t
   console.log(getOutput(result));
 }
 
+async function runSelfModify(args: string[]) {
+  const isAutoApprove = args.includes("--apply");
+  const instruction = args.filter(a => a !== "--apply").join(" ");
+  if (!instruction) {
+    console.error(pc.red("Usage: splash self-modify [--apply] <instruction>"));
+    return;
+  }
+
+  const { SelfModifier } = await import("@alpclaw/core");
+  const modifier = new SelfModifier(isAutoApprove);
+
+  console.log(pc.magenta("\nSPLASH SELF-MODIFIER"));
+  console.log(pc.dim(`Instruction: ${instruction}`));
+  console.log(pc.dim(`Mode: ${isAutoApprove ? "APPLY" : "DRY-RUN"}\n`));
+
+  const alpclaw = await buildAgent();
+  const prompt = `You are a self-modifying engine. The user has asked you to: ${instruction}
+Analyze the codebase in the current working directory, figure out which file needs changing, and output a JSON array of objects with 'file' and 'content'.
+Example: [{"file": "packages/core/src/index.ts", "content": "export const a = 1;"}]
+Do NOT use markdown blocks around the JSON. Output pure JSON.`;
+
+  const res = await alpclaw.createAgent({ onPhaseChange: () => {} }).run(prompt);
+  const out = getOutput(res);
+  
+  try {
+    let jsonStr = out;
+    if (jsonStr.includes("\`\`\`json")) {
+      jsonStr = jsonStr.split("\`\`\`json")[1].split("\`\`\`")[0].trim();
+    }
+    const changes = JSON.parse(jsonStr);
+    for (const change of changes) {
+      if (change.file && change.content) {
+         const result = await modifier.applyChange(change.file, change.content, instruction);
+         if (!result.ok) {
+           console.error(pc.red(`[ERR] Failed to apply to ${change.file}: ${result.error.message}`));
+         } else {
+           console.log(pc.green(`[OK] Applied to ${change.file}`));
+         }
+      }
+    }
+  } catch (e: any) {
+    console.error(pc.red("[ERR] Failed to parse agent response as JSON"), e.message);
+    console.log(out);
+  }
+}
+
+async function runSelfRollback(args: string[]) {
+  const timestamp = args[0];
+  if (!timestamp) {
+    console.error(pc.red("Usage: splash self-rollback <timestamp>"));
+    return;
+  }
+  const { SelfModifier } = await import("@alpclaw/core");
+  const modifier = new SelfModifier(true);
+  const result = await modifier.rollback(timestamp);
+  if (!result.ok) {
+    console.error(pc.red(`[ERR] Rollback failed: ${result.error.message}`));
+  } else {
+    console.log(pc.green(`[OK] Rolled back to ${timestamp}`));
+  }
+}
+
+
 // ──────────────────────────────────────────────────────────────────────────
 // Voice
 // ──────────────────────────────────────────────────────────────────────────
@@ -1330,8 +1434,44 @@ async function runMemory(args: string[]): Promise<void> {
     return;
   }
 
+  if (sub === "import") {
+    const inFile = args[1];
+    if (!inFile || !fs.existsSync(inFile)) {
+      console.error(pc.red("Usage: splash memory import <file.json>"));
+      return;
+    }
+    try {
+      const content = fs.readFileSync(inFile, "utf-8");
+      const entries = JSON.parse(content);
+      if (!Array.isArray(entries)) throw new Error("Expected JSON array");
+      
+      const newSessionId = "imported_" + Date.now();
+      const newFile = path.join(sessionsDir, newSessionId + ".jsonl");
+      if (!fs.existsSync(sessionsDir)) fs.mkdirSync(sessionsDir, { recursive: true });
+      
+      const lines = entries.map(e => JSON.stringify(e)).join("\n") + "\n";
+      fs.writeFileSync(newFile, lines, "utf-8");
+      console.log(pc.green(`Imported ${entries.length} entries into session ${newSessionId}`));
+    } catch (e: any) {
+      console.error(pc.red(`Failed to import: ${e.message}`));
+    }
+    return;
+  }
+
+  if (sub === "clear") {
+    if (fs.existsSync(sessionsDir)) {
+      fs.rmSync(sessionsDir, { recursive: true, force: true });
+    }
+    const knowledgePath = path.join(memDir, "knowledge.jsonl");
+    if (fs.existsSync(knowledgePath)) {
+      fs.rmSync(knowledgePath, { force: true });
+    }
+    console.log(pc.green("Cleared all memory."));
+    return;
+  }
+
   console.error(pc.red(`Unknown subcommand: memory ${sub}`));
-  console.log(pc.dim("  Available: list, search <query>, export [file]"));
+  console.log(pc.dim("  Available: list, search <query>, export [file], import <file>, clear"));
 }
 
 // ──────────────────────────────────────────────────────────────────────────

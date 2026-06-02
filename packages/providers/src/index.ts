@@ -10,4 +10,8 @@ export { MistralProvider } from "./mistral.js";
 export { CerebrasProvider } from "./cerebras.js";
 export { CohereProvider } from "./cohere.js";
 export { NvidiaProvider } from "./nvidia.js";
+export { TogetherProvider } from "./together.js";
+export { DeepseekProvider as DeepSeekProvider } from "./deepseek.js";
+export { GoogleProvider } from "./google.js";
+export { AnthropicProvider } from "./anthropic.js";
 export { ProviderRouter, type RoutingCriteria } from "./router.js";
