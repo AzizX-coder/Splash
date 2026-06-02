@@ -44,9 +44,10 @@ marked.use(markedTerminal() as any);
 // Read version from package.json at the repo root (works in bundled dist too via import.meta)
 import { createRequire } from "node:module";
 const _require = createRequire(import.meta.url);
-let VERSION = "2.1.0";
+
+let VERSION = "2.3.1";
 try {
-  const pkg = _require("../package.json");
+  const pkg = _require("../../package.json");
   VERSION = pkg.version || VERSION;
 } catch { /* bundled — use hardcoded */ }
 
