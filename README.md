@@ -34,10 +34,8 @@ It's designed to feel like OpenClaw / NanoClaw — install it, drop a key, go.
 ## Quick Start
 
 ```bash
-# 1. Install
-git clone https://github.com/AzizX-coder/Splash.git && cd Splash
-pnpm install
-pnpm link --global          # gives you the `splash` command anywhere
+# 1. Install via npm (works natively on Windows, macOS, and Linux)
+npm install -g splash-agent
 
 # 2. Configure (30 seconds)
 splash init                 # pick provider, paste key, pick model, pick safety
