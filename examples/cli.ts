@@ -43,6 +43,7 @@ marked.use(markedTerminal() as any);
 
 let VERSION = "unknown";
 try {
+  // @ts-ignore
   const pkg = await import("../../package.json", { assert: { type: "json" } });
   VERSION = pkg.default.version || VERSION;
 } catch {
@@ -321,7 +322,7 @@ async function runInit() {
     ollama: ["llama3", "mistral", "qwen2.5"],
   };
 
-  const modelOptions = defaultModels[provider as string].map(m => ({ value: m, label: m }));
+  const modelOptions = (defaultModels[provider as string] || ["default"]).map(m => ({ value: m, label: m }));
   const model = await p.select({
     message: "3. Default model:",
     options: modelOptions,
@@ -1018,7 +1019,7 @@ Do NOT use markdown blocks around the JSON. Output pure JSON.`;
   try {
     let jsonStr = out;
     if (jsonStr.includes("\`\`\`json")) {
-      jsonStr = jsonStr.split("\`\`\`json")[1].split("\`\`\`")[0].trim();
+      jsonStr = jsonStr.split("\`\`\`json")[1]?.split("\`\`\`")[0]?.trim() || jsonStr;
     }
     const changes = JSON.parse(jsonStr);
     for (const change of changes) {
@@ -1327,6 +1328,7 @@ async function runBrowser(args: string[]): Promise<void> {
 
   let playwright;
   try {
+    // @ts-ignore
     playwright = await import("playwright");
   } catch {
     console.error(pc.red("[ERR] Install playwright or puppeteer to use browser tools."));
