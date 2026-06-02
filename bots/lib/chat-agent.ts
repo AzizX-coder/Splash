@@ -27,8 +27,8 @@ function getPersona() {
   return _personaCache;
 }
 
-export function getAlpClaw(): AlpClaw {
-  if (!_alpclaw) _alpclaw = AlpClaw.create();
+export async function getAlpClaw(): Promise<AlpClaw> {
+  if (!_alpclaw) _alpclaw = await AlpClaw.create();
   return _alpclaw;
 }
 
@@ -45,7 +45,8 @@ export async function runChatTask(text: string): Promise<ChatRunResult> {
 
   try {
     const persona = getPersona();
-    const agent = getAlpClaw().createAgent({
+    const alpclaw = await getAlpClaw();
+    const agent = alpclaw.createAgent({
       systemPersona: persona ? persona : undefined
     });
     const result = await agent.run(trimmed);

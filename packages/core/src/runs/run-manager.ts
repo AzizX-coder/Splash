@@ -132,7 +132,7 @@ export class RunManager extends EventEmitter {
     let toolCalls = 0;
 
     try {
-      const alpclaw = AlpClaw.create();
+      const alpclaw = await AlpClaw.create();
       const agent = alpclaw.createAgent({
         onPhaseChange: (phase: AgentPhase) => {
           this.store.save({ ...(this.store.get(id) as RunRecord), phase });

@@ -1,6 +1,9 @@
 import type { AlpClawConfig, AlpClawConfigOverrides } from "@alpclaw/config";
 import { loadConfig } from "@alpclaw/config";
 import { SafetyEngine } from "@alpclaw/safety";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { globalConfigDir } from "@alpclaw/config";
 import { FileMemoryStore, MemoryManager } from "@alpclaw/memory";
 import {
   ProviderRouter,
@@ -43,6 +46,9 @@ import {
   DataAnalystSkill,
   SqlBuilderSkill,
   SubagentRunnerSkill,
+  GitHelperSkill,
+  LinearTriageSkill,
+  NotionSyncSkill,
 } from "@alpclaw/skills";
 import { createLogger } from "@alpclaw/utils";
 import { AgentLoop, type AgentLoopCallbacks } from "./agent-loop.js";
@@ -143,6 +149,9 @@ export class AlpClaw {
     this.skills.register(new DataAnalystSkill());
     this.skills.register(new SqlBuilderSkill());
     this.skills.register(new SubagentRunnerSkill());
+    this.skills.register(new GitHelperSkill());
+    this.skills.register(new LinearTriageSkill());
+    this.skills.register(new NotionSyncSkill());
 
     // ── Safety ─────────────────────────────────────────────────────────────
     this.safety = new SafetyEngine(config.safety.mode, config.safety.blockedPatterns);
@@ -162,12 +171,45 @@ export class AlpClaw {
   /**
    * Create an AlpClaw instance with default configuration.
    */
-  static create(overrides?: AlpClawConfigOverrides): AlpClaw {
+  static async create(overrides?: AlpClawConfigOverrides): Promise<AlpClaw> {
     const configResult = loadConfig(overrides);
     if (!configResult.ok) {
       throw new Error(`Failed to load config: ${configResult.error.message}`);
     }
-    return new AlpClaw(configResult.value);
+    const instance = new AlpClaw(configResult.value);
+    
+    // Auto-discover dynamic skills in ~/.splash/skills/*/index.js
+    const skillsDir = path.join(globalConfigDir(), "skills");
+    if (fs.existsSync(skillsDir)) {
+      const dirs = fs.readdirSync(skillsDir, { withFileTypes: true });
+      for (const dir of dirs) {
+        if (dir.isDirectory()) {
+          const indexJs = path.join(skillsDir, dir.name, "index.js");
+          const indexMjs = path.join(skillsDir, dir.name, "index.mjs");
+          let target = fs.existsSync(indexMjs) ? indexMjs : (fs.existsSync(indexJs) ? indexJs : null);
+          if (target) {
+            try {
+              // Convert to file:// URL for Windows compatibility with import()
+              const fileUrl = `file://${target.replace(/\\/g, "/")}`;
+              const mod = await import(fileUrl);
+              if (mod.default && typeof mod.default === "object" && mod.default.manifest) {
+                instance.skills.register(mod.default);
+              } else {
+                for (const exp of Object.values(mod)) {
+                  if (exp && typeof exp === "object" && (exp as any).manifest) {
+                    instance.skills.register(exp as any);
+                  }
+                }
+              }
+            } catch (e: any) {
+               log.error(`Failed to load dynamic skill from ${dir.name}: ${e.message}`);
+            }
+          }
+        }
+      }
+    }
+    
+    return instance;
   }
 
   /**

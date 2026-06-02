@@ -19,3 +19,6 @@ export { WebScraperSkill } from "./built-in/web-scraper.js";
 export { DataAnalystSkill } from "./built-in/data-analyst.js";
 export { SqlBuilderSkill } from "./built-in/sql-builder.js";
 export { SubagentRunnerSkill } from "./built-in/subagent-runner.js";
+export { GitHelperSkill } from "./built-in/git-helper.js";
+export { LinearTriageSkill } from "./built-in/linear-triage.js";
+export { NotionSyncSkill } from "./built-in/notion-sync.js";

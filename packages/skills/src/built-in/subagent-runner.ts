@@ -74,7 +74,7 @@ export class SubagentRunnerSkill implements Skill {
   private async invokeSubagent(objective: string): Promise<{ success: boolean; text: string }> {
     try {
       const core = await import("@alpclaw/core");
-      const alpclaw = core.AlpClaw.create();
+      const alpclaw = await core.AlpClaw.create();
       const agent = alpclaw.createAgent({
         // Subagents run silently — no spinners or phase logs
         onPhaseChange: () => {},

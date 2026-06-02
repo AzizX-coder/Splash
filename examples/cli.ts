@@ -604,6 +604,7 @@ async function launchTui(_focusId?: string): Promise<void> {
   const ink = await import("ink");
   const React = await import("react");
   const { TuiApp } = await import("@alpclaw/core");
+  const a = await buildAgent();
   const manager = new RunManager();
   const { waitUntilExit } = ink.render(
     React.createElement(TuiApp, { manager }),
@@ -630,7 +631,8 @@ async function runFromCli(prompt: string, opts: { background: boolean }): Promis
     console.log(pc.dim(`  attach: splash runs attach ${id}`));
     return;
   }
-  await runOneShot(prompt);
+  const alpclaw = await buildAgent();
+  await runOneShot(alpclaw, prompt);
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -744,10 +746,10 @@ function ensureConfigured(): void {
   }
 }
 
-function buildAgent(): AlpClaw {
+async function buildAgent(): Promise<AlpClaw> {
   ensureConfigured();
   try {
-    return AlpClaw.create();
+    return await AlpClaw.create();
   } catch (err) {
     console.error(pc.red(`Failed to initialize Splash: ${String(err)}`));
     process.exit(1);
@@ -784,7 +786,7 @@ function printStatusLine(a: AlpClaw): void {
   );
 }
 
-async function runTask(alpclaw: AlpClaw, description: string, persona?: string): Promise<void> {
+async function runOneShot(alpclaw: AlpClaw, description: string, persona?: string): Promise<void> {
   const cfg = readGlobalConfig();
   const style = cfg.cli?.style || "splash";
   
