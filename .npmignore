@@ -1,0 +1,28 @@
+# Source & dev tooling
+.git/
+.github/
+.alpclaw/
+.env
+.env.*
+!.env.example
+coverage/
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Dev-only files
+benchmarks.md
+LOGO.md
+project/
+tests/
+vitest.config.ts
+.prettierrc
+
+# pnpm workspace (not needed for npm consumers)
+pnpm-workspace.yaml
+pnpm-lock.yaml

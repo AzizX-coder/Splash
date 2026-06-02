@@ -36,7 +36,16 @@ function verifyEd25519(body: string, signature: string, timestamp: string, publi
 function readBody(req: http.IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    req.on("data", (c: Buffer) => chunks.push(c));
+    let totalSize = 0;
+    req.on("data", (c: Buffer) => {
+      totalSize += c.length;
+      if (totalSize > 1_048_576) {
+        req.destroy();
+        reject(new Error("Request body too large"));
+        return;
+      }
+      chunks.push(c);
+    });
     req.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
     req.on("error", reject);
   });
@@ -55,10 +64,16 @@ async function main() {
   console.log(pc.bgCyan(pc.black(" SYSTEM BOOT ")) + " AlpClaw Discord Connector");
 
   const publicKey = process.env.DISCORD_PUBLIC_KEY;
+  const botToken = process.env.DISCORD_BOT_TOKEN;
   const port = Number(process.env.DISCORD_PORT || 3004);
 
   if (!publicKey) {
     console.error(pc.bgRed(pc.white(" ERROR ")) + " DISCORD_PUBLIC_KEY must be set.");
+    process.exit(1);
+  }
+
+  if (!botToken) {
+    console.error("Missing DISCORD_BOT_TOKEN. Set it in env or via: splash config set-bot discord DISCORD_BOT_TOKEN <token>");
     process.exit(1);
   }
 
@@ -109,6 +124,16 @@ async function main() {
 
     // Anything else: acknowledge but ignore
     res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({ type: 1 }));
+  });
+
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      console.error(`\n❌ Port ${port} is already in use.`);
+      console.error(`   Another process is bound to this port.`);
+      console.error(`   Fix: kill the process using port ${port}, or set DISCORD_PORT=<other port>\n`);
+      process.exit(1);
+    }
+    throw err;
   });
 
   server.listen(port, () => {

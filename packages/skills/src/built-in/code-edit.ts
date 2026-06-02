@@ -54,7 +54,7 @@ export class CodeEditSkill implements Skill {
           });
         }
 
-        const newContent = content.replace(search, replacement);
+        const newContent = content.replaceAll(search, replacement);
         const writeResult = await ctx.runConnector("fs.write", {
           path: filePath,
           content: newContent,

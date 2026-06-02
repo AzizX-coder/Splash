@@ -44,7 +44,7 @@ export class SelfCorrector {
     }
 
     // Use LLM for complex correction analysis
-    return this.analyzWithLLM(originalAction, originalParams, verification, error);
+    return this.analyzeWithLLM(originalAction, originalParams, verification, error);
   }
 
   private tryQuickFix(
@@ -73,7 +73,7 @@ export class SelfCorrector {
     return null;
   }
 
-  private async analyzWithLLM(
+  private async analyzeWithLLM(
     originalAction: string,
     originalParams: Record<string, unknown>,
     verification: VerificationResult,

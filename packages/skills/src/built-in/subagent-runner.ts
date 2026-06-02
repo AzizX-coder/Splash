@@ -1,8 +1,7 @@
 import type { SkillManifest, SkillResult, Result } from "@alpclaw/utils";
 import { ok, err, createError } from "@alpclaw/utils";
 import type { Skill, SkillContext } from "../skill.js";
-import { AlpClaw } from "@alpclaw/core";
-
+// Dynamic import used later to avoid circular dependency with @alpclaw/core
 /**
  * SubagentRunnerSkill — spawns parallel autonomous sub-agents for complex tasks.
  *
@@ -74,7 +73,8 @@ export class SubagentRunnerSkill implements Skill {
 
   private async invokeSubagent(objective: string): Promise<{ success: boolean; text: string }> {
     try {
-      const alpclaw = AlpClaw.create();
+      const core = await import("@alpclaw/core");
+      const alpclaw = core.AlpClaw.create();
       const agent = alpclaw.createAgent({
         // Subagents run silently — no spinners or phase logs
         onPhaseChange: () => {},

@@ -84,9 +84,21 @@ importers:
       '@clack/prompts':
         specifier: ^1.2.0
         version: 1.2.0
+      ink:
+        specifier: ^5.0.1
+        version: 5.2.1(@types/react@18.3.28)(react@18.3.1)
+      marked:
+        specifier: ^15.0.12
+        version: 15.0.12
+      marked-terminal:
+        specifier: ^7.3.0
+        version: 7.3.0(marked@15.0.12)
       picocolors:
         specifier: ^1.1.1
         version: 1.1.1
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
 
   packages/config:
     dependencies:
@@ -135,6 +147,12 @@ importers:
       '@alpclaw/utils':
         specifier: workspace:*
         version: link:../utils
+      ink:
+        specifier: ^5.0.1
+        version: 5.2.1(@types/react@18.3.28)(react@18.3.1)
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
       zod:
         specifier: ^3.23.0
         version: 3.25.76

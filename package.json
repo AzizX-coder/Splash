@@ -2,25 +2,67 @@
   "name": "splash",
   "version": "0.2.0",
   "private": true,
-  "description": "Splash — Autonomous Agent Platform",
-  "author": "Splash",
+  "description": "Splash — Autonomous Agent Platform: CLI + multi-provider agent loop + TUI dashboard + platform bots",
+  "author": "Splash Contributors",
   "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AzizX-coder/Splash.git"
+  },
+  "homepage": "https://github.com/AzizX-coder/Splash#readme",
+  "bugs": {
+    "url": "https://github.com/AzizX-coder/Splash/issues"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "autonomous",
+    "cli",
+    "tui",
+    "llm",
+    "openrouter",
+    "claude",
+    "gpt",
+    "gemini",
+    "deepseek",
+    "ollama",
+    "telegram-bot",
+    "slack-bot",
+    "discord-bot"
+  ],
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=18.0.0"
   },
   "bin": {
     "splash": "./bin/splash.mjs",
     "alpclaw": "./bin/alpclaw.mjs"
   },
+  "files": [
+    "bin/",
+    "packages/",
+    "bots/",
+    "examples/cli.ts",
+    "examples/demo-standalone.ts",
+    "examples/package.json",
+    "templates/",
+    "tsconfig.json",
+    "pnpm-workspace.yaml",
+    "README.md",
+    "LICENSE",
+    ".env.example"
+  ],
   "scripts": {
     "build": "pnpm -r run build",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint packages/ examples/ --ext .ts",
+    "lint": "echo \"eslint v9 migration pending\"",
     "format": "prettier --write \"packages/**/*.ts\" \"examples/**/*.ts\"",
     "clean": "pnpm -r run clean",
-    "dev": "tsx examples/cli.ts"
+    "dev": "tsx examples/cli.ts",
+    "prepare": "pnpm run build",
+    "prepublishOnly": "pnpm run typecheck && pnpm run lint && pnpm run test"
   },
   "devDependencies": {
     "@types/marked-terminal": "^6.1.1",

@@ -32,19 +32,17 @@ export class WebSearchSkill implements Skill {
 
       // We use duckduckgo-lite to scrape without an API key natively.
       const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-      const curlCommand = `curl -s "${url}" | grep -o 'class="result__snippet[^>]*>.*</a>' | sed 's/<[^>]*>//g' | head -n 5`;
-
-      const result = await ctx.runConnector("terminal.run", {
-        command: curlCommand,
-      });
-
-      if (!result.ok) {
-        return err(createError("skill", `Search execution failed: ${result.error.message}`));
+      
+      const res = await fetch(url);
+      if (!res.ok) {
+        return err(createError("skill", `Search execution failed: HTTP ${res.status}`));
       }
-
-      // The result from terminal connector includes stdout and stderr
-      const output = (result.value as any)?.stdout || String(result.value);
-      const text = output.trim();
+      
+      const html = await res.text();
+      // Extract snippet using regex since we don't have cheerio loaded
+      const snippetRegex = /class="result__snippet[^>]*>(.*?)<\/a>/g;
+      const matches = [...html.matchAll(snippetRegex)].slice(0, 5);
+      const text = matches.map(m => (m[1] || "").replace(/<[^>]*>/g, "")).join("\n\n").trim();
 
       if (!text) {
         return ok({

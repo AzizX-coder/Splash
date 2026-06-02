@@ -18,6 +18,9 @@ import {
   HttpConnector,
   BrowserConnector,
   GitConnector,
+  GitHubConnector,
+  MessagingConnector,
+  WebhookConnector,
 } from "@alpclaw/connectors";
 import {
   SkillRegistry,
@@ -115,6 +118,9 @@ export class AlpClaw {
     this.connectors.register(new HttpConnector());
     this.connectors.register(new BrowserConnector());
     this.connectors.register(new GitConnector());
+    this.connectors.register(new GitHubConnector(""));
+    this.connectors.register(new MessagingConnector());
+    this.connectors.register(new WebhookConnector());
 
     // ── Skills ─────────────────────────────────────────────────────────────
     this.skills = new SkillRegistry();
@@ -133,6 +139,7 @@ export class AlpClaw {
     this.skills.register(new PythonRunnerSkill());
     this.skills.register(new ShellRunnerSkill());
     this.skills.register(new CodeReviewerSkill());
+    this.skills.register(new WebScraperSkill());
     this.skills.register(new DataAnalystSkill());
     this.skills.register(new SqlBuilderSkill());
     this.skills.register(new SubagentRunnerSkill());

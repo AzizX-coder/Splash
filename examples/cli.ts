@@ -60,8 +60,8 @@ const BOT_SPECS: Record<
 > = {
   telegram:  { file: "telegram.ts",  label: "Telegram",  requiredKeys: ["TELEGRAM_BOT_TOKEN"] },
   slack:     { file: "slack.ts",     label: "Slack",     requiredKeys: ["SLACK_BOT_TOKEN", "SLACK_SIGNING_SECRET"] },
-  whatsapp:  { file: "whatsapp.ts",  label: "WhatsApp",  requiredKeys: ["TWILIO_AUTH_TOKEN", "TWILIO_WHATSAPP_FROM"] },
-  messenger: { file: "messenger.ts", label: "Messenger", requiredKeys: ["FB_PAGE_ACCESS_TOKEN", "FB_VERIFY_TOKEN", "FB_APP_SECRET"] },
+  whatsapp:  { file: "whatsapp.ts",  label: "WhatsApp",  requiredKeys: ["TWILIO_AUTH_TOKEN"] },
+  messenger: { file: "messenger.ts", label: "Messenger", requiredKeys: ["MESSENGER_PAGE_TOKEN", "MESSENGER_VERIFY_TOKEN"] },
   discord:   { file: "discord.ts",   label: "Discord",   requiredKeys: ["DISCORD_PUBLIC_KEY", "DISCORD_BOT_TOKEN"] },
 };
 
@@ -114,6 +114,7 @@ async function main() {
         await runWorker(args[1], args.slice(2).join(" "));
         return;
       }
+      console.error("Usage: splash _worker <run-id> <task>");
       process.exit(2);
       break;
     case "run":
@@ -188,7 +189,7 @@ function printHelp() {
 async function runInit() {
   console.log(renderBanner({ subtitle: "Setup" }));
   p.intro(pc.bgCyan(pc.black(" 💧 SPLASH INIT ")));
-  p.log.message("Pick a provider and drop in a key. You can change this any time with `alpclaw config`.");
+  p.log.message("Pick a provider and drop in a key. You can change this any time with `splash config`.");
 
   const existing = readGlobalConfig();
   const next: GlobalConfigShape = { ...existing };
@@ -242,7 +243,7 @@ async function runInit() {
 
   writeGlobalConfig(next);
   p.outro(pc.green(`✓ Saved to ${globalConfigPath()}`));
-  console.log(pc.dim(`\nTry it: ${pc.cyan("alpclaw \"summarize this folder\"")}`));
+  console.log(pc.dim(`\nTry it: ${pc.cyan("splash \"summarize this folder\"")}`));
 }
 
 async function runConfig(args: string[]) {
@@ -275,7 +276,7 @@ async function runConfig(args: string[]) {
     const [key, ...rest] = args.slice(1);
     const val = rest.join(" ");
     if (!key || val === "") {
-      console.error("Usage: splash configset <defaultProvider|defaultModel|safetyMode> <value>");
+      console.error("Usage: splash config set <defaultProvider|defaultModel|safetyMode> <value>");
       process.exit(2);
     }
     const allowed = ["defaultProvider", "defaultModel", "safetyMode"] as const;
@@ -292,7 +293,7 @@ async function runConfig(args: string[]) {
     const [provider, ...rest] = args.slice(1);
     const val = rest.join(" ");
     if (!provider || !val) {
-      console.error("Usage: splash configset-key <provider> <api-key>");
+      console.error("Usage: splash config set-key <provider> <api-key>");
       process.exit(2);
     }
     setApiKey(provider, val);
@@ -304,7 +305,7 @@ async function runConfig(args: string[]) {
     const [bot, field, ...rest] = args.slice(1);
     const val = rest.join(" ");
     if (!bot || !field || !val) {
-      console.error("Usage: splash configset-bot <bot> <field> <value>");
+      console.error("Usage: splash config set-bot <bot> <field> <value>");
       process.exit(2);
     }
     setBotCredential(bot, field, val);
@@ -560,6 +561,7 @@ function formatEventLine(e: any, json: boolean): string {
 
 async function launchTui(_focusId?: string): Promise<void> {
   if (!process.stdout.isTTY) {
+    console.log(pc.dim("TUI requires an interactive terminal. Falling back to run list."));
     await runRunsCmd(["list"]);
     return;
   }
@@ -623,7 +625,7 @@ async function runBot(name: string) {
   const missing = spec.requiredKeys.filter((k) => !env[k]);
   if (missing.length) {
     console.error(pc.red(`Missing ${spec.label} credentials: ${missing.join(", ")}`));
-    console.error(pc.dim("Run `alpclaw config set-bot " + name + " <FIELD> <value>` for each."));
+    console.error(pc.dim("Run `splash config set-bot " + name + " <FIELD> <value>` for each."));
     process.exit(2);
   }
 
@@ -667,8 +669,10 @@ function providerEnvKey(provider: string): string | null {
 function loadPersona(): string | undefined {
   const localChar = path.resolve(process.cwd(), "character.md");
   const home = process.env.HOME || process.env.USERPROFILE || "";
+  const splashChar = path.resolve(home, ".splash", "character.md");
   const globalChar = path.resolve(home, ".alpclaw", "character.md");
   if (fs.existsSync(localChar)) return fs.readFileSync(localChar, "utf-8");
+  if (fs.existsSync(splashChar)) return fs.readFileSync(splashChar, "utf-8");
   if (fs.existsSync(globalChar)) return fs.readFileSync(globalChar, "utf-8");
   return undefined;
 }

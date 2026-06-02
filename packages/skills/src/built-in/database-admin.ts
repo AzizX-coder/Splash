@@ -32,6 +32,9 @@ export class DatabaseAdminSkill implements Skill {
       if (!query.trim().toLowerCase().startsWith("select") && !query.trim().toLowerCase().startsWith(".table") && !query.trim().toLowerCase().startsWith(".schema")) {
         return err(createError("skill", "Security violation: Only SELECT, .tables, or .schema queries are permitted by the db-admin skill."));
       }
+      if (query.includes(";")) {
+        return err(createError("skill", "Security violation: Multiple statements separated by semicolons are not permitted."));
+      }
 
       ctx.log(`Executing optimized SQL on ${dbPath}`);
       

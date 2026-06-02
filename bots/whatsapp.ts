@@ -13,7 +13,7 @@
 import * as crypto from "node:crypto";
 import * as http from "node:http";
 import pc from "picocolors";
-import { runChatTask, getAlpClaw } from "./lib/chat-agent.js";
+import { runChatTask, getAlpClaw, chunkText } from "./lib/chat-agent.js";
 
 function parseForm(body: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -45,18 +45,31 @@ function twilioSignatureValid(
 function readBody(req: http.IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    req.on("data", (c: Buffer) => chunks.push(c));
+    let totalSize = 0;
+    req.on("data", (c: Buffer) => {
+      totalSize += c.length;
+      if (totalSize > 1_048_576) {
+        req.destroy();
+        reject(new Error("Request body too large"));
+        return;
+      }
+      chunks.push(c);
+    });
     req.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
     req.on("error", reject);
   });
 }
 
-function twiml(text: string): string {
-  const escaped = text
+function escapeXml(text: string): string {
+  return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
-  return `<?xml version="1.0" encoding="UTF-8"?><Response><Message>${escaped}</Message></Response>`;
+}
+
+function twiml(texts: string[]): string {
+  const messages = texts.map((t) => `<Message>${escapeXml(t)}</Message>`).join("");
+  return `<?xml version="1.0" encoding="UTF-8"?><Response>${messages}</Response>`;
 }
 
 async function main() {
@@ -97,13 +110,24 @@ async function main() {
     const from = params["From"] || "unknown";
     const text = (params["Body"] || "").trim();
     if (!text) {
-      res.writeHead(200, { "Content-Type": "text/xml" }).end(twiml("Please send a non-empty message."));
+      res.writeHead(200, { "Content-Type": "text/xml" }).end(twiml(["Please send a non-empty message."]));
       return;
     }
 
     console.log(pc.dim(`[whatsapp] <${from}> ${text.slice(0, 80)}`));
     const { reply } = await runChatTask(text);
-    res.writeHead(200, { "Content-Type": "text/xml" }).end(twiml(reply));
+    const chunks = chunkText(reply, 1500);
+    res.writeHead(200, { "Content-Type": "text/xml" }).end(twiml(chunks));
+  });
+
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      console.error(`\n❌ Port ${port} is already in use.`);
+      console.error(`   Another process is bound to this port.`);
+      console.error(`   Fix: kill the process using port ${port}, or set WHATSAPP_PORT=<other port>\n`);
+      process.exit(1);
+    }
+    throw err;
   });
 
   server.listen(port, () => {

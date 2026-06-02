@@ -49,7 +49,16 @@ async function postMessage(token: string, channel: string, text: string, threadT
 function readBody(req: http.IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    req.on("data", (c: Buffer) => chunks.push(c));
+    let totalSize = 0;
+    req.on("data", (c: Buffer) => {
+      totalSize += c.length;
+      if (totalSize > 1_048_576) {
+        req.destroy();
+        reject(new Error("Request body too large"));
+        return;
+      }
+      chunks.push(c);
+    });
     req.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
     req.on("error", reject);
   });
@@ -125,6 +134,16 @@ async function main() {
       await postMessage(token, ev.channel, piece, ev.thread_ts || ev.ts);
     }
     void ack;
+  });
+
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      console.error(`\n❌ Port ${port} is already in use.`);
+      console.error(`   Another process is bound to this port.`);
+      console.error(`   Fix: kill the process using port ${port}, or set SLACK_PORT=<other port>\n`);
+      process.exit(1);
+    }
+    throw err;
   });
 
   server.listen(port, () => {
