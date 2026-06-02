@@ -7,6 +7,9 @@ import {
   createLogger,
 } from "@alpclaw/utils";
 import type { MemoryStore } from "./store.js";
+import { EpisodicMemory } from "./episodic.js";
+import { UserProfile } from "./profile.js";
+import { SkillMemory } from "./skill-memory.js";
 
 const log = createLogger("memory");
 
@@ -15,6 +18,10 @@ const log = createLogger("memory");
  * It handles ID generation, timestamps, and convenience methods.
  */
 export class MemoryManager {
+  public readonly episodic = new EpisodicMemory();
+  public readonly profile = new UserProfile();
+  public readonly skills = new SkillMemory();
+
   constructor(private store: MemoryStore) {}
 
   /** Remember a piece of information. */

@@ -143,42 +143,22 @@ async function main() {
 // Help
 // ──────────────────────────────────────────────────────────────────────────
 
-function printHelp() {
-  console.log(renderBanner({ subtitle: "Autonomous Agent" }));
+function printHelp(): void {
+  console.log(renderBanner({ compact: true }));
   console.log(
     [
-      pc.bold("USAGE"),
-      `  ${pc.cyan("splash")}                            Open an interactive chat`,
-      `  ${pc.cyan("splash")} "build me a script"        Run a one-shot task`,
-      `  ${pc.cyan("splash")} "..." --background          Detach and return a run id`,
       "",
-      pc.bold("CORE COMMANDS"),
-      `  ${pc.cyan("splash init")}                       30-second setup wizard`,
-      `  ${pc.cyan("splash tui")}                        Open the live run dashboard`,
-      `  ${pc.cyan("splash help")}                       Show this help`,
+      `  ${pc.cyan("Run   ")} ${pc.dim("│")} run, exec, ask, "prompt"`,
+      `  ${pc.cyan("Memory")} ${pc.dim("│")} memory list/search/export, profile show/set`,
+      `  ${pc.cyan("Config")} ${pc.dim("│")} config list/get/set, providers list/test`,
+      `  ${pc.cyan("Skills")} ${pc.dim("│")} skills list, skills enable/disable, skills suggest`,
+      `  ${pc.cyan("Runs  ")} ${pc.dim("│")} runs list/logs/stop/retry`,
+      `  ${pc.cyan("System")} ${pc.dim("│")} doctor, update, auth, init`,
       "",
-      pc.bold("RUNS"),
-      `  ${pc.cyan("splash runs list")}                  Show active/recent runs`,
-      `  ${pc.cyan("splash runs logs")} ID [--follow]    Tail events for a run`,
-      `  ${pc.cyan("splash runs attach")} ID             Open a run in the TUI`,
-      `  ${pc.cyan("splash runs stop")} ID               Cancel a running run`,
-      `  ${pc.cyan("splash runs retry")} ID [-b]         Re-run a task`,
+      pc.dim(`  Config: ${globalConfigPath()}`),
+      pc.dim(`  Env:    SPLASH_* vars work. .env in cwd is read.`),
       "",
-      pc.bold("CONFIG"),
-      `  ${pc.cyan("splash config list")}                Show effective config`,
-      `  ${pc.cyan("splash config doctor")}              Verify keys / perms / reachability`,
-      `  ${pc.cyan("splash config preset")} fast|balanced|safe`,
-      `  ${pc.cyan("splash config set")} KEY VAL         Set a field`,
-      `  ${pc.cyan("splash config set-key")} P VAL       Save API key for provider`,
-      "",
-      pc.bold("PLATFORMS"),
-      `  ${pc.cyan("splash telegram")}|${pc.cyan("slack")}|${pc.cyan("whatsapp")}|${pc.cyan("messenger")}|${pc.cyan("discord")}`,
-      "",
-      pc.dim(`Config: ${globalConfigPath()}`),
-      pc.dim(`Env:    SPLASH_* and legacy ALPCLAW_* vars both work. .env in cwd is read.`),
-      pc.dim(`Alias:  \`alpclaw\` still works — it delegates to \`splash\`.`),
-      "",
-    ].join("\n"),
+    ].join("\n")
   );
 }
 
@@ -196,13 +176,19 @@ async function runInit() {
   next.apiKeys = { ...(existing.apiKeys || {}) };
 
   const provider = await p.select({
-    message: "Default provider:",
+    message: "1. Default provider:",
     options: [
-      { value: "openrouter", label: "OpenRouter — recommended, unlocks Kimi K2, DeepSeek, Qwen, Claude, GPT-4" },
+      { value: "openrouter", label: "OpenRouter — recommended, unlocks massive model catalog" },
       { value: "claude",     label: "Anthropic Claude" },
       { value: "openai",     label: "OpenAI (GPT-4o)" },
       { value: "gemini",     label: "Google Gemini" },
       { value: "deepseek",   label: "DeepSeek" },
+      { value: "nous",       label: "Nous Portal" },
+      { value: "groq",       label: "Groq (ultra-fast)" },
+      { value: "mistral",    label: "Mistral" },
+      { value: "cerebras",   label: "Cerebras" },
+      { value: "cohere",     label: "Cohere" },
+      { value: "nvidia",     label: "NVIDIA NIM" },
       { value: "ollama",     label: "Ollama (local, no key needed)" },
     ],
   });
@@ -211,14 +197,14 @@ async function runInit() {
   next.defaultProvider = provider as string;
 
   if (provider !== "ollama") {
-    const key = await p.password({ message: `Paste your ${provider} API key (input hidden):` });
+    const key = await p.password({ message: `2. Paste your ${provider} API key (input hidden):` });
     if (p.isCancel(key)) return abort();
     if (key) next.apiKeys[provider as string] = key as string;
   }
 
   if (provider === "openrouter") {
     const model = await p.select({
-      message: "Default model:",
+      message: "3. Default model:",
       options: [
         { value: "moonshotai/kimi-k2",           label: "Kimi K2 (Moonshot) — long context, strong coding" },
         { value: "moonshotai/kimi-k2-0905",      label: "Kimi K2 0905 (newer snapshot)" },
@@ -232,7 +218,7 @@ async function runInit() {
   }
 
   const safety = await p.select({
-    message: "Safety level:",
+    message: "4. Safety level:",
     options: [
       { value: "standard",   label: "Standard — confirms risky actions (recommended)" },
       { value: "strict",     label: "Strict — confirms every action" },
@@ -240,6 +226,20 @@ async function runInit() {
     ],
   });
   if (!p.isCancel(safety)) next.safetyMode = safety as GlobalConfigShape["safetyMode"];
+
+  const theme = await p.select({
+    message: "5. CLI Theme:",
+    options: [
+      { value: "splash",     label: "Splash (Default) — Water animations & rich output" },
+      { value: "hermes",     label: "Hermes — Clean bracket-based logs" },
+      { value: "openclaw",   label: "OpenClaw — Compact status-light header" },
+      { value: "minimal",    label: "Minimal — Pure prompt, silent execution" },
+    ],
+  });
+  if (!p.isCancel(theme)) {
+    next.cli = next.cli || {};
+    next.cli.style = theme as "splash" | "hermes" | "openclaw" | "minimal";
+  }
 
   writeGlobalConfig(next);
   p.outro(pc.green(`✓ Saved to ${globalConfigPath()}`));
@@ -340,8 +340,9 @@ async function runConfig(args: string[]) {
 
 async function runDoctor(args: string[]): Promise<void> {
   const json = args.includes("--json");
+  const autofix = args.includes("--fix") || args.includes("--autofix");
   const cfg = readGlobalConfig();
-  const checks: { name: string; ok: boolean; detail: string; fix?: string }[] = [];
+  const checks: { name: string; ok: boolean; detail: string; fix?: string; autoFixer?: () => Promise<void> | void }[] = [];
 
   // 1. provider key present
   const hasAnyKey =
@@ -357,6 +358,10 @@ async function runDoctor(args: string[]): Promise<void> {
     ok: hasAnyKey,
     detail: hasAnyKey ? "found" : "none",
     fix: "splash init  — or  splash config set-key openrouter sk-or-...",
+    autoFixer: async () => {
+      console.log(pc.yellow("\nMissing provider key. Launching setup wizard..."));
+      await runInit();
+    }
   });
 
   // 2. write perms
@@ -374,6 +379,12 @@ async function runDoctor(args: string[]): Promise<void> {
     ok: writable,
     detail: dir,
     fix: `chmod u+w ${dir}`,
+    autoFixer: () => {
+      try {
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+        fs.chmodSync(dir, 0o700);
+      } catch (e) {}
+    }
   });
 
   // 3. runs dir
@@ -386,7 +397,18 @@ async function runDoctor(args: string[]): Promise<void> {
   } catch {
     runsOK = false;
   }
-  checks.push({ name: "runs dir writable", ok: runsOK, detail: rdir });
+  checks.push({ 
+    name: "runs dir writable", 
+    ok: runsOK, 
+    detail: rdir,
+    fix: `chmod u+w ${rdir}`,
+    autoFixer: () => {
+      try {
+        if (!fs.existsSync(rdir)) fs.mkdirSync(rdir, { recursive: true, mode: 0o700 });
+        fs.chmodSync(rdir, 0o700);
+      } catch (e) {}
+    }
+  });
 
   // 4. provider reachability (best effort — skip if no fetch)
   const defaultProvider = cfg.defaultProvider || "openrouter";
@@ -433,6 +455,20 @@ async function runDoctor(args: string[]): Promise<void> {
   const bad = checks.filter((c) => !c.ok).length;
   console.log();
   console.log(bad === 0 ? pc.green("All checks passed.") : pc.yellow(`${bad} check(s) failed.`));
+
+  if (bad !== 0 && autofix) {
+    console.log(pc.cyan("\nRunning autofix for failed checks..."));
+    for (const c of checks) {
+      if (!c.ok && c.autoFixer) {
+        await c.autoFixer();
+      }
+    }
+    console.log(pc.green("\nAutofix complete. Run `splash doctor` again to verify."));
+    process.exit(0);
+  } else if (bad !== 0 && !autofix) {
+    console.log(pc.dim(`\nRun \`${pc.cyan("splash doctor --fix")}\` to automatically resolve issues.`));
+  }
+
   if (bad !== 0) process.exit(1);
 }
 
