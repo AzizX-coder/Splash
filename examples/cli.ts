@@ -78,12 +78,58 @@ const BOT_SPECS: Record<
 // Entry routing
 // ──────────────────────────────────────────────────────────────────────────
 
+function getLevenshteinDistance(a: string, b: string): number {
+  const matrix = Array(b.length + 1).fill(null).map(() => Array(a.length + 1).fill(null));
+  for (let i = 0; i <= a.length; i++) matrix[0][i] = i;
+  for (let j = 0; j <= b.length; j++) matrix[j][0] = j;
+  for (let j = 1; j <= b.length; j++) {
+    for (let i = 1; i <= a.length; i++) {
+      const indicator = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[j][i] = Math.min(
+        matrix[j][i - 1] + 1,
+        matrix[j - 1][i] + 1,
+        matrix[j - 1][i - 1] + indicator
+      );
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
 async function main() {
   const args = process.argv.slice(2);
-  const cmd = args[0];
+  let cmd = args[0];
 
   if (!cmd) {
     printHelp();
+    return;
+  }
+
+  const KNOWN_COMMANDS = [
+    "version", "help", "init", "setup", "config", "chat", "telegram", "slack", 
+    "whatsapp", "messenger", "discord", "runs", "tui", "dashboard", "self-improve", 
+    "providers", "skills", "memory", "maintenance", "voice", "swarm", "antigravity", 
+    "run", "doctor"
+  ];
+
+  if (!KNOWN_COMMANDS.includes(cmd)) {
+    let bestMatch = cmd;
+    let bestDist = Infinity;
+    for (const known of KNOWN_COMMANDS) {
+      const dist = getLevenshteinDistance(cmd, known);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestMatch = known;
+      }
+    }
+    if (bestDist <= 2) {
+      console.log(`Did you mean: ${bestMatch}?`);
+      cmd = bestMatch;
+      args[0] = bestMatch;
+    }
+  }
+
+  if (cmd === "doctor") {
+    await runConfig(["doctor"]);
     return;
   }
 
@@ -171,9 +217,6 @@ async function main() {
       break;
   }
 
-  // Fallback: treat args as a one-shot prompt. Support --background flag.
-  const bg = args.includes("--background") || args.includes("-b");
-  const promptText = args.filter((a) => a !== "--background" && a !== "-b").join(" ");
   await runFromCli(promptText, { background: bg });
 }
 
@@ -652,11 +695,54 @@ async function launchTui(_focusId?: string): Promise<void> {
 // runFromCli — foreground or background one-shot
 // ──────────────────────────────────────────────────────────────────────────
 
+async function checkFastPath(prompt: string): Promise<boolean> {
+  const lowerPrompt = prompt.toLowerCase().trim();
+  
+  const createMatch = lowerPrompt.match(/^(?:(?:run\s+)?(?:create|make)\s+file)\s+(.+)$/);
+  if (createMatch) {
+    try {
+      fs.writeFileSync(path.resolve(process.cwd(), createMatch[1]), "");
+      console.log(`[OK] file created: ${createMatch[1]}`);
+    } catch (e: any) {
+      console.log(`[ERR] failed to create file: ${e.message}`);
+    }
+    return true;
+  }
+
+  const runMatch = lowerPrompt.match(/^(?:(?:run\s+)?command|execute)\s+(.+)$/);
+  if (runMatch) {
+    try {
+      spawnSync(runMatch[1], { shell: true, stdio: "inherit" });
+      console.log(`[OK] command executed: ${runMatch[1]}`);
+    } catch (e: any) {
+      console.log(`[ERR] command failed: ${e.message}`);
+    }
+    return true;
+  }
+
+  const searchMatch = lowerPrompt.match(/^(?:(?:run\s+)?search(?:\s+for)?)\s+(.+)$/);
+  if (searchMatch) {
+    console.log(`[INFO] Searching for: ${searchMatch[1]}...`);
+    const { WebSearchSkill } = await import("@alpclaw/skills");
+    const skill = new WebSearchSkill();
+    const result = await skill.execute({ query: searchMatch[1] }, {} as any);
+    console.log(result.output || "[INFO] No results found.");
+    return true;
+  }
+
+  return false;
+}
+
 async function runFromCli(prompt: string, opts: { background: boolean }): Promise<void> {
   if (!prompt.trim()) {
     console.log('Use splash run "prompt" instead.');
     return;
   }
+  
+  if (await checkFastPath(prompt)) {
+    return;
+  }
+
   ensureConfigured();
   if (opts.background) {
     const rm = new RunManager();
@@ -884,25 +970,19 @@ async function runProviders(args: string[]): Promise<void> {
   if (sub === "list") {
     const alpclaw = await buildAgent();
     const providers = alpclaw.router.listProviders();
-    console.log(pc.bold("\n  Configured Providers\n"));
-    console.log(
-      `  ${pc.dim("Name".padEnd(14))} ${pc.dim("Status".padEnd(10))} ${pc.dim("Models")}`,
-    );
-    console.log(pc.dim("  " + "-".repeat(40)));
+    console.log(`  ${pc.dim("Name".padEnd(14))} ${pc.dim("Status".padEnd(10))} ${pc.dim("Models")}`);
 
     for (const prov of providers) {
-      let status = pc.green("ready");
+      let status = "OK";
       let modelCount = "-";
       try {
         const models = await prov.provider.listModels();
         modelCount = String(models.length);
-        if (!prov.provider.isAvailable()) status = pc.yellow("no key");
+        if (!prov.provider.isAvailable()) status = "ERR no key";
       } catch {
-        status = pc.red("error");
+        status = "ERR";
       }
-      console.log(
-        `  ${pc.white(prov.name.padEnd(14))} ${status.padEnd(10)} ${pc.dim(modelCount)}`,
-      );
+      console.log(`  ${prov.name.padEnd(14)} ${status.padEnd(10)} ${modelCount}`);
     }
     console.log();
     return;

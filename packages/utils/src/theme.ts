@@ -42,23 +42,21 @@ export const C = {
 // ─── Icons ──────────────────────────────────────────────────────────────────
 
 export const I = {
-  check: "✓",
-  cross: "✗",
-  warn: "⚠",
-  info: "ℹ",
-  bullet: "•",
-  arrow: "→",
-  chevron: "›",
+  check: "[OK]",
+  cross: "[ERR]",
+  warn: "[WARN]",
+  info: "[INFO]",
+  bullet: "-",
+  arrow: "->",
+  chevron: ">",
 
-  dot: "●",
-  circle: "○",
-  square: "▣",
-  diamond: "◆",
+  dot: ".",
+  circle: "o",
+  square: "[]",
+  diamond: "<>",
 
-  /** Droplet — the Splash mascot */
   drop: "~",
-  /** Wave */
-  wave: "≈",
+  wave: "~",
 };
 
 // ─── style helpers ──────────────────────────────────────────────────────────
@@ -86,74 +84,49 @@ export const style = {
 
 // ─── Banner ──────────────────────────────────────────────────────────────────
 
-/**
- * Splash brand banner — block-letter SPLASH with aqua gradient and wave framing.
- */
-export function renderBanner(opts?: { subtitle?: string; compact?: boolean }): string {
-  const { subtitle = "Autonomous Agent Platform", compact = false } = opts || {};
+export function renderBanner(opts?: { subtitle?: string; compact?: boolean; style?: string }): string {
+  const { subtitle = "Autonomous Agent Platform", compact = false, style: themeStyle = "splash" } = opts || {};
 
-  // Respect NO_SPLASH=1 to suppress all art
-  if (process.env.NO_SPLASH === "1") {
+  if (process.env.NO_SPLASH === "1" || themeStyle === "silent") {
+    return "";
+  }
+
+  if (themeStyle === "edge") {
     return `\n  splash — ${subtitle}\n`;
   }
+
+  const isHydro = themeStyle === "hydro";
+  const color1 = isHydro ? style.blue : style.sky;
+  const color2 = isHydro ? style.skyLight : style.skyLight;
 
   if (compact) {
     return [
       "",
-      `  ${style.heading("Splash")} ${style.subtle("·")} ${style.softWhite(subtitle)}`,
+      `  ${color1("SPLASH")} ${style.subtle("·")} ${style.softWhite(subtitle)}`,
       "",
     ].join("\n");
   }
 
-  // Gradient stops: deep teal → aqua → sky foam
-  const gradient = (line: string): string => {
-    const len = line.length;
-    let out = "";
-    for (let i = 0; i < len; i++) {
-      const char = line[i]!;
-      const t = i / Math.max(len - 1, 1);
-      let r, g, b;
-      if (t < 0.5) {
-        const t2 = t / 0.5;
-        r = Math.round(14 + (34 - 14) * t2);
-        g = Math.round(116 + (211 - 116) * t2);
-        b = Math.round(144 + (238 - 144) * t2);
-      } else {
-        const t2 = (t - 0.5) / 0.5;
-        r = Math.round(34 + (165 - 34) * t2);
-        g = Math.round(211 + (243 - 211) * t2);
-        b = Math.round(238 + (252 - 238) * t2);
-      }
-      out += `\x1b[38;2;${r};${g};${b}m${char}`;
-    }
-    return out + RESET;
-  };
-
   const logo = [
-    "         ",
-    " ≈≈≈≈≈≈ ",
-    " SPLASH "
+    "  ___ ___ _    _   ___ _  _ ",
+    " / __| _ \\ |  /_\\ / __| || |",
+    " \\__ \\  _/ | / _ \\\\__ \\ __ |",
+    " |___/_| |_\\/_/ \\_\\___/_||_|"
   ];
 
-  const wave = "≈≈≈  ∿  ≈  ∿  ≈≈  ∿  ≈  ∿  ≈≈≈";
-
   const terminalWidth = process.stdout.columns || 80;
-  const logoWidth = 8;
+  const logoWidth = logo[0]!.length;
   const leftPadCount = Math.max(0, Math.floor((terminalWidth - logoWidth) / 2));
   const pad = " ".repeat(leftPadCount);
 
-  const titleStrip = `${style.sky("≈".repeat(10))}  ${style.bold(style.white(subtitle))}  ${style.sky("≈".repeat(10))}`;
+  const titleStrip = `${color1("~".repeat(10))}  ${style.bold(style.white(subtitle))}  ${color1("~".repeat(10))}`;
   const rawTitleLen = 20 + 2 + subtitle.length + 2;
   const titlePadCount = Math.max(0, Math.floor((terminalWidth - rawTitleLen) / 2));
   const titlePad = " ".repeat(titlePadCount);
 
-  const wavePad = " ".repeat(Math.max(0, Math.floor((terminalWidth - wave.length) / 2)));
-
   const lines = [
     "",
-    wavePad + style.skyLight(wave),
-    ...logo.map((l) => pad + gradient(l)),
-    wavePad + style.sky(wave),
+    ...logo.map((l) => pad + color1(l)),
     "",
     titlePad + titleStrip,
     "",
@@ -246,22 +219,20 @@ export async function pulseWordmark(word: string = "Splash", cycles: number = 2)
 
 // ─── Loading animations ─────────────────────────────────────────────────────
 
-/** Braille spinner frames — smooth circular motion. */
-export const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+/** Clean spinner frames. */
+export const SPINNER_FRAMES = ["-", "\\", "|", "/"];
 
-/** Droplet loader frames — playful water-themed. */
-export const DROP_FRAMES = ["~ ", " ~", "  ~", "   ~", "~~", "~~~", "~"];
+/** Simple frames. */
+export const DROP_FRAMES = [".", "..", "..."];
 
-/** Wave loader frames. */
+/** Text frames. */
 export const WAVE_FRAMES = [
-  "[≈     ]",
-  "[ ≈≈    ]",
-  "[  ≈≈≈  ]",
-  "[   ≈≈≈≈]",
-  "[    ≈≈≈]",
-  "[     ≈≈]",
-  "[      ≈]",
-  "[       ]",
+  "[=     ]",
+  "[ =    ]",
+  "[  =   ]",
+  "[   =  ]",
+  "[    = ]",
+  "[     =]",
 ];
 
 export interface LoaderHandle {

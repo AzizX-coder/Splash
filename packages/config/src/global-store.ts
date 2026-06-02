@@ -27,7 +27,7 @@ export interface GlobalConfigShape {
   apiKeys?: Record<string, string>;
   bots?: Record<string, Record<string, string>>;
   cli?: {
-    style?: "splash" | "hermes" | "openclaw" | "minimal";
+    style?: "splash" | "hydro" | "edge" | "silent";
     showThinking?: boolean;
     showToolUse?: boolean;
     timestamp?: boolean;
