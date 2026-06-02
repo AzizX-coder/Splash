@@ -24,6 +24,18 @@ export class EpisodicMemory {
     return path.join(this.baseDir, `${sessionId}.jsonl`);
   }
 
+  public getAllSessions(): { sessionId: string; mtimeMs: number }[] {
+    if (!fs.existsSync(this.baseDir)) return [];
+    const files = fs.readdirSync(this.baseDir).filter((file) => file.endsWith(".jsonl"));
+    return files.map((file) => {
+      const stat = fs.statSync(path.join(this.baseDir, file));
+      return {
+        sessionId: path.basename(file, ".jsonl"),
+        mtimeMs: stat.mtimeMs,
+      };
+    }).sort((a, b) => b.mtimeMs - a.mtimeMs);
+  }
+
   public append(sessionId: string, message: MessageEntry): void {
     const filePath = this.getSessionFile(sessionId);
     const line = JSON.stringify(message) + "\n";

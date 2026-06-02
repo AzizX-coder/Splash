@@ -108,6 +108,9 @@ async function main() {
     case "dashboard":
       await launchTui();
       return;
+    case "self-improve":
+      await runSelfImprove();
+      return;
     case "_worker":
       // internal: spawned by background runs to execute a pre-allocated run id
       if (args[1] && args[2]) {
@@ -153,7 +156,7 @@ function printHelp(): void {
       `  ${pc.cyan("Config")} ${pc.dim("│")} config list/get/set, providers list/test`,
       `  ${pc.cyan("Skills")} ${pc.dim("│")} skills list, skills enable/disable, skills suggest`,
       `  ${pc.cyan("Runs  ")} ${pc.dim("│")} runs list/logs/stop/retry`,
-      `  ${pc.cyan("System")} ${pc.dim("│")} doctor, update, auth, init`,
+      `  ${pc.cyan("System")} ${pc.dim("│")} doctor, update, auth, init, self-improve`,
       "",
       pc.dim(`  Config: ${globalConfigPath()}`),
       pc.dim(`  Env:    SPLASH_* vars work. .env in cwd is read.`),
@@ -633,6 +636,54 @@ async function runFromCli(prompt: string, opts: { background: boolean }): Promis
   }
   const alpclaw = await buildAgent();
   await runOneShot(alpclaw, prompt);
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Self-Improvement Loop
+// ──────────────────────────────────────────────────────────────────────────
+
+async function runSelfImprove() {
+  console.log(pc.magenta("\n🧠 SPLASH SELF-MODIFICATION ENGINE"));
+  console.log(pc.dim("Analyzing recent sessions to extract learnings...\n"));
+  
+  const { EpisodicMemory } = await import("@alpclaw/memory");
+  const episodic = new EpisodicMemory();
+  const sessions = episodic.getAllSessions();
+  if (sessions.length === 0) {
+    console.log(pc.yellow("No sessions found to learn from."));
+    return;
+  }
+  
+  const latestSessions = sessions.slice(0, 5);
+  let aggregatedLogs = "";
+  for (const s of latestSessions) {
+    const msgs = await episodic.getLastNMessages(s.sessionId, 100);
+    aggregatedLogs += `\n--- SESSION ${s.sessionId} ---\n`;
+    for (const msg of msgs) {
+       aggregatedLogs += `[${msg.role}] ${msg.content}\n`;
+    }
+  }
+  
+  const alpclaw = await buildAgent();
+  const prompt = `You are the core intelligence of Splash. Your goal is to analyze your recent conversation logs, identify mistakes you made, and write rules to prevent them in the future.
+  
+Recent Logs:
+${aggregatedLogs.slice(-10000)}
+
+Output ONLY a list of crisp, actionable rules you should adopt. Do not explain them. Be concise.`;
+
+  console.log(pc.cyan("Analyzing..."));
+  const result = await alpclaw.createAgent({ onPhaseChange: () => {} }).run(prompt);
+  
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const { globalConfigDir } = await import("@alpclaw/config");
+  const learningsFile = path.join(globalConfigDir(), "learnings.md");
+  const learnings = `\n## Learnings (${new Date().toISOString()})\n${result.text}\n`;
+  fs.appendFileSync(learningsFile, learnings);
+  
+  console.log(pc.green(`✓ Success! New rules added to ${learningsFile}:\n`));
+  console.log(result.text);
 }
 
 // ──────────────────────────────────────────────────────────────────────────

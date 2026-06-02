@@ -10,9 +10,10 @@
  *   - Uses character.md persona if present
  */
 
-import { Telegraf } from "telegraf";
+import { Telegraf, Markup } from "telegraf";
 import pc from "picocolors";
 import { runChatTask, getAlpClaw, chunkText } from "./lib/chat-agent.js";
+import { readGlobalConfig, writeGlobalConfig } from "@alpclaw/config";
 
 const MAX_MSG = 3800;
 
@@ -49,6 +50,64 @@ async function main() {
   console.log(pc.dim("─".repeat(60)));
   console.log(pc.dim("Waiting for messages... (Ctrl+C to stop)\n"));
 
+  bot.command("mode", async (ctx) => {
+    try {
+      const cfg = readGlobalConfig();
+      const currentMode = cfg.safety?.mode || "permissive";
+      
+      const keyboard = Markup.inlineKeyboard([
+        Markup.button.callback(currentMode === "permissive" ? "✅ Permissive" : "Permissive", "mode:permissive"),
+        Markup.button.callback(currentMode === "strict" ? "✅ Strict" : "Strict", "mode:strict"),
+      ]);
+      
+      await ctx.reply("Select safety mode:", keyboard);
+    } catch (e: any) {
+      await ctx.reply("⚠️ Failed to load modes. Please try again.");
+    }
+  });
+
+  bot.command("provider", async (ctx) => {
+    try {
+      const alpclaw = await getAlpClaw();
+      const providers = alpclaw.router.listProviders();
+      const current = readGlobalConfig().providers?.default || "openrouter";
+      
+      const buttons = providers.map(p => [
+        Markup.button.callback(current === p.name ? `✅ ${p.name}` : p.name, `provider:${p.name}`)
+      ]);
+      
+      await ctx.reply("Select default provider:", Markup.inlineKeyboard(buttons));
+    } catch (e: any) {
+      await ctx.reply("⚠️ Failed to load providers. Please try again.");
+    }
+  });
+
+  bot.on("callback_query", async (ctx) => {
+    try {
+      const cb = ctx.callbackQuery as any;
+      if (!cb.data) return;
+      
+      const [action, value] = cb.data.split(":");
+      const cfg = readGlobalConfig();
+      
+      if (action === "mode") {
+        cfg.safety = cfg.safety || { mode: "permissive" };
+        cfg.safety.mode = value as "permissive" | "strict";
+        writeGlobalConfig(cfg);
+        await ctx.editMessageText(`✅ Safety mode set to ${value}.`);
+      } else if (action === "provider") {
+        cfg.providers = cfg.providers || { default: value, apiKeys: {} };
+        cfg.providers.default = value;
+        writeGlobalConfig(cfg);
+        await ctx.editMessageText(`✅ Provider set to ${value}.`);
+      }
+      
+      await ctx.answerCbQuery();
+    } catch (e: any) {
+       await ctx.answerCbQuery("Error updating config.").catch(() => null);
+    }
+  });
+
   bot.on("text", async (ctx) => {
     const text = ctx.message.text;
     const from = ctx.message.from;
@@ -65,7 +124,25 @@ async function main() {
     });
 
     const startMs = Date.now();
-    const { reply, success } = await runChatTask(text);
+    let reply = "";
+    let success = false;
+    let attempts = 0;
+    const maxAttempts = 2;
+    
+    while (attempts < maxAttempts) {
+      attempts++;
+      const res = await runChatTask(text);
+      reply = res.reply;
+      success = res.success;
+      if (success || attempts >= maxAttempts) break;
+      console.log(`${ts()} ${pc.yellow("⚠ RETRY")} Attempt ${attempts} failed, retrying...`);
+    }
+
+    if (!success) {
+       // Friendly error wrapper — hide stack trace from user
+       reply = "⚠️ I encountered an internal error while processing your request. Please check the terminal logs or try again later.";
+    }
+
     const elapsed = ((Date.now() - startMs) / 1000).toFixed(1);
 
     const pieces = chunkText(reply, MAX_MSG);
