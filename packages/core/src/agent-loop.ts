@@ -191,12 +191,36 @@ export class AgentLoop {
 
       const verification = this.verifier.verifyTaskCompletion(taskDescription, stepResults);
 
+      let finalSummary = verification.passed
+        ? `Task completed successfully (${task.steps.length} steps)`
+        : `Task completed with ${verification.issues.length} issues: ${verification.issues.join("; ")}`;
+
+      if (verification.passed) {
+        const summaryPrompt = `The user requested: "${taskDescription}"
+
+I have completed the task in ${task.steps.length} steps. Here are the results of my actions:
+${JSON.stringify(stepResults.map(r => ({ desc: r.description, out: String(r.output).substring(0, 500) })))}
+
+Provide a concise, conversational final reply to the user. If they just said a greeting like "hi", simply greet them back. If a complex task was performed, summarize the outcome and provide the final result clearly. Be helpful and natural.`;
+
+        const summaryRes = await this.router.route({
+          messages: [
+            { role: "system", content: this.callbacks.systemPersona || "You are Splash, a helpful and highly capable autonomous agent." },
+            { role: "user", content: summaryPrompt }
+          ],
+          temperature: 0.2,
+          maxTokens: 1000
+        });
+
+        if (summaryRes.ok && summaryRes.value.content.trim()) {
+          finalSummary = summaryRes.value.content.trim();
+        }
+      }
+
       const taskResult = {
         success: verification.passed,
         output: stepResults,
-        summary: verification.passed
-          ? `Task completed successfully (${task.steps.length} steps)`
-          : `Task completed with ${verification.issues.length} issues: ${verification.issues.join("; ")}`,
+        summary: finalSummary,
         artifacts: task.steps
           .filter((s) => s.output)
           .map((s) => String(s.output))
