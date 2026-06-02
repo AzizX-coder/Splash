@@ -287,7 +287,11 @@ async function main() {
     }
   });
 
-  bot.launch();
+  bot.catch((err, ctx) => {
+    console.log(`${ts()} ${pc.bgRed(" ERR ")} Telegram Bot Error:`, String(err));
+  });
+
+  bot.launch({ dropPendingUpdates: true });
   console.log(pc.green("⚡ Bot is live and listening!"));
 
   process.once("SIGINT", () => bot.stop("SIGINT"));

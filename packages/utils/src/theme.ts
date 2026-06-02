@@ -108,10 +108,11 @@ export function renderBanner(opts?: { subtitle?: string; compact?: boolean; styl
   }
 
   const logo = [
-    "  ___ ___ _    _   ___ _  _ ",
-    " / __| _ \\ |  /_\\ / __| || |",
-    " \\__ \\  _/ | / _ \\\\__ \\ __ |",
-    " |___/_| |_\\/_/ \\_\\___/_||_|"
+    " ██████  ██████  ██       █████  ███████ ██   ██",
+    "██      ██    ██ ██      ██   ██ ██      ██   ██",
+    "███████ ███████  ██      ███████ ███████ ███████",
+    "     ██ ██       ██      ██   ██      ██ ██   ██",
+    "██████  ██       ███████ ██   ██ ███████ ██   ██"
   ];
 
   const terminalWidth = process.stdout.columns || 80;
@@ -220,20 +221,13 @@ export async function pulseWordmark(word: string = "Splash", cycles: number = 2)
 // ─── Loading animations ─────────────────────────────────────────────────────
 
 /** Clean spinner frames. */
-export const SPINNER_FRAMES = ["-", "\\", "|", "/"];
+export const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 /** Simple frames. */
 export const DROP_FRAMES = [".", "..", "..."];
 
 /** Text frames. */
-export const WAVE_FRAMES = [
-  "[=     ]",
-  "[ =    ]",
-  "[  =   ]",
-  "[   =  ]",
-  "[    = ]",
-  "[     =]",
-];
+export const WAVE_FRAMES = [" ", "▂", "▃", "▄", "▅", "▆", "▇", "█", "▇", "▆", "▅", "▄", "▃", "▂"];
 
 export interface LoaderHandle {
   stop(finalText?: string): void;

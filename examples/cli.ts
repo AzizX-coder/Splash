@@ -284,18 +284,50 @@ async function runInit() {
   }
 
   if (provider === "openrouter") {
-    const model = await p.select({
-      message: "3. Default model:",
+    const s = p.spinner();
+    s.start("Fetching live OpenRouter models...");
+    let liveModels: any[] = [];
+    try {
+      const res = await fetch("https://openrouter.ai/api/v1/models");
+      const data = await res.json() as any;
+      liveModels = data.data.sort((a: any, b: any) => a.id.localeCompare(b.id));
+    } catch (e) {
+      // Fallback
+    }
+    s.stop("Models loaded.");
+
+    const category = await p.select({
+      message: "3. Model Category:",
       options: [
-        { value: "anthropic/claude-sonnet-4",          label: "Claude Sonnet 4 (Anthropic) — best overall" },
-        { value: "google/gemini-2.5-flash-preview",    label: "Gemini 2.5 Flash (Google) — fast and capable" },
-        { value: "openai/gpt-4.1",                     label: "GPT-4.1 (OpenAI) — reliable all-rounder" },
-        { value: "deepseek/deepseek-r1",               label: "DeepSeek R1 — strong reasoning, free tier" },
-        { value: "moonshotai/kimi-k2",                 label: "Kimi K2 (Moonshot) — 128k context, free tier" },
-        { value: "qwen/qwen3-235b-a22b",               label: "Qwen3 235B (Alibaba) — massive, free tier" },
-        { value: "meta-llama/llama-4-maverick",         label: "Llama 4 Maverick (Meta) — open weights" },
-        { value: "mistralai/mistral-medium-3",          label: "Mistral Medium 3 — European, fast" },
-      ],
+        { value: "free", label: "Free — Top performing free models (DeepSeek, Llama)" },
+        { value: "paid", label: "Premium (Paid) — SOTA models (Claude 3.5, GPT-4o, Gemini Pro)" },
+        { value: "all", label: "All Live Models" },
+      ]
+    });
+    if (p.isCancel(category)) return abort();
+
+    let options: { value: string; label: string }[] = [];
+    if (liveModels.length > 0) {
+      const isFree = (m: any) => m.pricing?.prompt === "0" && m.pricing?.completion === "0";
+      const filtered = category === "free" ? liveModels.filter(isFree) 
+                     : category === "paid" ? liveModels.filter((m: any) => !isFree(m))
+                     : liveModels;
+      
+      options = filtered.slice(0, 50).map((m: any) => ({ 
+        value: m.id, 
+        label: `${m.name} ${isFree(m) ? pc.green("(Free)") : pc.yellow("(Paid)")} - ${m.context_length}k ctx` 
+      }));
+    } else {
+      // Fallback hardcoded if offline
+      options = [
+        { value: "anthropic/claude-3.5-sonnet", label: "Claude 3.5 Sonnet (Premium)" },
+        { value: "deepseek/deepseek-r1:free", label: "DeepSeek R1 (Free)" },
+      ];
+    }
+
+    const model = await p.select({
+      message: "4. Default model:",
+      options: options,
     });
     if (!p.isCancel(model)) next.defaultModel = model as string;
   }

@@ -46,6 +46,31 @@ export async function runChatTask(text: string): Promise<ChatRunResult> {
   try {
     const persona = getPersona();
     const alpclaw = await getAlpClaw();
+    
+    // Conversational Fast-Path (Sub-second response for basic chat)
+    const router = alpclaw.router;
+    const fastCheck = await router.route({
+       messages: [
+         { role: "system", content: "You are a fast intent classifier. Does the user's message require using external tools, searching the web, reading/writing files, or doing any complex tasks? Reply strictly with 'YES' or 'NO'." },
+         { role: "user", content: trimmed }
+       ],
+       temperature: 0,
+       maxTokens: 10
+    });
+
+    if (fastCheck.ok && fastCheck.value.content.trim().toUpperCase().startsWith("NO")) {
+       const quickReply = await router.route({
+          messages: [
+            { role: "system", content: persona || "You are Splash, a helpful and highly capable autonomous agent." },
+            { role: "user", content: trimmed }
+          ],
+          temperature: 0.4,
+          maxTokens: 1000
+       });
+       if (quickReply.ok) return { reply: quickReply.value.content.trim(), success: true };
+    }
+
+    // Full Agent Loop (Complex tasks)
     const agent = alpclaw.createAgent({
       systemPersona: persona ? persona : undefined
     });

@@ -51,6 +51,8 @@ import {
   NotionSyncSkill,
   ConfigEditorSkill,
   TaskQueueSkill,
+  ProjectGeneratorSkill,
+  DocumentGeneratorSkill,
 } from "@alpclaw/skills";
 import { createLogger } from "@alpclaw/utils";
 import { AgentLoop, type AgentLoopCallbacks } from "./agent-loop.js";
@@ -156,6 +158,8 @@ export class AlpClaw {
     this.skills.register(new NotionSyncSkill());
     this.skills.register(new ConfigEditorSkill());
     this.skills.register(new TaskQueueSkill());
+    this.skills.register(new ProjectGeneratorSkill());
+    this.skills.register(new DocumentGeneratorSkill());
 
     // ── Safety ─────────────────────────────────────────────────────────────
     this.safety = new SafetyEngine(config.safety.mode, config.safety.blockedPatterns);
