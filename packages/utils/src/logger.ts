@@ -92,8 +92,8 @@ let rootLogger: Logger | undefined;
 
 export function getRootLogger(): Logger {
   if (!rootLogger) {
-    const envLevel = (process.env["ALPCLAW_LOG_LEVEL"] as LogLevel) || "info";
-    rootLogger = new Logger("alpclaw", envLevel);
+    const envLevel = (process.env["SPLASH_LOG_LEVEL"] || process.env["ALPCLAW_LOG_LEVEL"] || "warn") as LogLevel;
+    rootLogger = new Logger("splash", envLevel);
   }
   return rootLogger;
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 
 /**
- * Splash CLI — OpenClaw-style entrypoint.
+ * Splash CLI — Autonomous Agent Platform entrypoint.
  *
  * Usage:
  *   splash                          Open an interactive chat.
@@ -74,11 +74,16 @@ async function main() {
   const cmd = args[0];
 
   if (!cmd) {
-    console.log('Use splash run "prompt" instead.');
+    printHelp();
     return;
   }
 
   switch (cmd) {
+    case "version":
+    case "--version":
+    case "-v":
+      console.log(`splash-agent v${process.env.npm_package_version || "2.0.3"}`);
+      return;
     case "help":
     case "--help":
     case "-h":

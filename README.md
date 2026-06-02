@@ -27,7 +27,7 @@ Splash is a **local-first autonomous agent** you call from any directory. One gl
 
 Under the hood: a **10-phase agent loop** (intake → understand → plan → context → tool-select → execute → verify → correct → finalize → persist) over a **multi-provider router** (OpenRouter/Kimi, Claude, GPT, Gemini, DeepSeek, Ollama), backed by a **persistent run store** you can inspect live in an Ink TUI.
 
-It's designed to feel like OpenClaw / NanoClaw — install it, drop a key, go.
+It's designed to be dead simple — install it, drop a key, go.
 
 ---
 
