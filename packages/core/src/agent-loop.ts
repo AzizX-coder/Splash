@@ -21,6 +21,12 @@ import { TaskManager } from "./task-manager.js";
 import { Planner } from "./planner.js";
 import { Verifier } from "./verifier.js";
 import { SelfCorrector } from "./self-corrector.js";
+import { ContractBuilder, type Contract } from "./contract-builder.js";
+import { ContractValidator } from "./contract-validator.js";
+import { StateMachine } from "./state-machine.js";
+import { ContextManager } from "./context-manager.js";
+import { ResultCache } from "./cache.js";
+import { Reflector, type StepOutcome } from "./reflector.js";
 
 const log = createLogger("core:agent");
 
@@ -56,6 +62,14 @@ export class AgentLoop {
   private stepAttempts = new Map<string, number>();
   private toolTrace: Array<{ tool: string; args: Record<string, unknown>; ok: boolean; output?: unknown; error?: string }> = [];
 
+  // v4 Contract Engine
+  private contractBuilder: ContractBuilder;
+  private contractValidator: ContractValidator;
+  private stateMachine: StateMachine;
+  private contextManager: ContextManager;
+  private cache: ResultCache;
+  private reflector: Reflector;
+
   constructor(
     private router: ProviderRouter,
     private connectors: ConnectorRegistry,
@@ -74,6 +88,16 @@ export class AgentLoop {
       maxRetries: appConfig.agent.maxRetries,
       timeoutMs: appConfig.agent.timeoutMs,
     };
+
+    // v4 Contract Engine initialization
+    this.contractBuilder = new ContractBuilder(router);
+    this.contractValidator = new ContractValidator(
+      appConfig.safety?.blockedPatterns || [],
+    );
+    this.stateMachine = new StateMachine();
+    this.contextManager = new ContextManager(100_000);
+    this.cache = new ResultCache();
+    this.reflector = new Reflector();
   }
 
   /**
@@ -82,107 +106,164 @@ export class AgentLoop {
   async run(taskDescription: string): Promise<Result<Task>> {
     const startTime = Date.now();
     const task = this.taskManager.create(taskDescription);
+    this.stateMachine.reset();
 
     log.info("Agent loop started", { taskId: task.id, description: taskDescription.slice(0, 100) });
 
+    // Wire state machine to phase callbacks
+    this.stateMachine.onTransition((from, to) => {
+      const phaseMap: Record<string, AgentPhase> = {
+        building_contract: "plan",
+        validating: "plan",
+        checking_cache: "context_fetch",
+        executing: "execute",
+        verifying: "verify",
+        correcting: "correct",
+        reflecting: "persist",
+        done: "finalize",
+        failed: "finalize",
+      };
+      const phase = phaseMap[to];
+      if (phase) this.setPhase(task, phase);
+    });
+
     try {
-      // Phase 1: Intake
+      // ── Intake ─────────────────────────────────────────────────────────────
       this.setPhase(task, "intake");
       task.context.userIntent = taskDescription;
 
-      // Phase 2: Understand — use LLM to clarify the task
+      // ── Understand ─────────────────────────────────────────────────────────
       this.setPhase(task, "understand");
       const understanding = await this.understand(task);
       if (!understanding.ok) {
         return this.failTask(task, understanding.error.message);
       }
 
-      // Phase 3: Plan — break task into steps
-      this.setPhase(task, "plan");
-      this.taskManager.setStatus(task.id, "planning");
-      
+      // ── Build Contract ─────────────────────────────────────────────────────
+      this.stateMachine.transition("start");
+
       const contextHints = await this.memory.getRelevantContext(taskDescription);
       if (this.callbacks.systemPersona) {
-         contextHints.unshift(`IMPORTANT PERSONA/SYSTEM PROMPT: ${this.callbacks.systemPersona}`);
+        contextHints.unshift(`IMPORTANT PERSONA/SYSTEM PROMPT: ${this.callbacks.systemPersona}`);
       }
 
-      const planResult = await this.planner.createPlan(
+      const contractResult = await this.contractBuilder.buildContract(
         understanding.value,
         this.connectors.allToolDefinitions(),
         this.skills.list(),
         contextHints,
       );
 
-      if (!planResult.ok) {
-        return this.failTask(task, `Planning failed: ${planResult.error.message}`);
+      if (!contractResult.ok) {
+        this.stateMachine.transition("abort");
+        return this.failTask(task, `Contract build failed: ${contractResult.error.message}`);
       }
 
-      const plan = planResult.value;
-      log.info("Plan created", { steps: plan.steps.length, complexity: plan.estimatedComplexity });
+      const contract = contractResult.value;
+      this.stateMachine.transition("contract_built");
+      log.info("Contract built", { steps: contract.steps.length, objective: contract.objective.slice(0, 60) });
 
-      // Create task steps from plan
-      for (const planStep of plan.steps) {
-        this.taskManager.addStep(task.id, planStep.description, planStep.toolOrSkill);
+      // ── Validate Contract ──────────────────────────────────────────────────
+      const validation = this.contractValidator.validate(contract);
+      if (!validation.valid) {
+        this.stateMachine.transition("invalid");
+        const reasons = validation.issues.map((i) => i.message).join("; ");
+        return this.failTask(task, `Contract validation failed: ${reasons}`);
+      }
+      this.stateMachine.transition("valid");
+
+      // ── Check Cache ────────────────────────────────────────────────────────
+      const cacheKey = ResultCache.hashKey(
+        taskDescription,
+        JSON.stringify(contextHints),
+        "default",
+        "default",
+      );
+      const cached = this.cache.get(cacheKey);
+      if (cached) {
+        this.stateMachine.transition("cache_hit");
+        log.info("Cache hit, returning cached result");
+        const taskResult = { success: true, output: cached, summary: String(cached), artifacts: [] };
+        this.taskManager.complete(task.id, taskResult);
+        this.callbacks.onTaskComplete?.(task);
+        return ok(task);
+      }
+      this.stateMachine.transition("cache_miss");
+
+      // ── Create task steps from contract ────────────────────────────────────
+      for (const contractStep of contract.steps) {
+        this.taskManager.addStep(task.id, contractStep.description, contractStep.tools[0]);
       }
 
-      // Phase 4-7: Execute each step
+      // ── Execute ────────────────────────────────────────────────────────────
       this.taskManager.setStatus(task.id, "executing");
       let stepIndex = 0;
+      let correctionTier = 0; // 0=retry, 1=contract-reduce, 2=escalate
 
       for (const step of task.steps) {
-        // Check timeout
         if (Date.now() - startTime > this.config.timeoutMs) {
           return this.failTask(task, "Task timed out");
         }
-
-        // Check max steps
         if (stepIndex >= this.config.maxSteps) {
           return this.failTask(task, "Maximum steps exceeded");
         }
+        if (this.contextManager.isOverBudget()) {
+          log.warn("Token budget exhausted, stopping execution");
+          break;
+        }
 
-        // Phase 4: Context fetch (per-step)
         this.setPhase(task, "context_fetch");
-
-        // Phase 5: Tool select
         this.setPhase(task, "tool_select");
-
-        // Phase 6: Execute
         this.setPhase(task, "execute");
         this.taskManager.updateStep(task.id, step.id, { status: "executing" });
+        this.contextManager.allocate(step.id);
 
         const execResult = await this.executeStep(task, step.description, step.toolName);
 
-        // Phase 7: Verify
         this.setPhase(task, "verify");
         this.taskManager.setStatus(task.id, "verifying");
 
         if (!execResult.ok) {
-          // Phase 8: Self-correct (per-step retry budget)
           this.setPhase(task, "correct");
           this.callbacks.onError?.(execResult.error.message, "execute");
-          const corrected = await this.selfCorrect(task, step, execResult.error);
 
-          if (!corrected) {
-            this.taskManager.updateStep(task.id, step.id, {
-              status: "failed",
-              error: execResult.error,
-            });
-            // Continue with next steps if possible, don't abort entire task
-            log.warn("Step failed after correction attempts", { stepId: step.id });
+          // 3-tier recovery (§2.9)
+          correctionTier++;
+          if (correctionTier <= 1) {
+            // Tier 1: bounded self-correction
+            const corrected = await this.selfCorrect(task, step, execResult.error);
+            if (!corrected) {
+              this.taskManager.updateStep(task.id, step.id, { status: "failed", error: execResult.error });
+              log.warn("Step failed after correction", { stepId: step.id, tier: 1 });
+            }
+          } else if (correctionTier === 2) {
+            // Tier 2: contract reduction — skip remaining non-essential steps
+            log.warn("Tier 2 recovery: reducing contract scope", { stepId: step.id });
+            this.taskManager.updateStep(task.id, step.id, { status: "failed", error: execResult.error });
+            break;
+          } else {
+            // Tier 3: escalate to user
+            log.warn("Tier 3 recovery: escalating to user", { stepId: step.id });
+            this.callbacks.onError?.(
+              `Step "${step.description}" failed 3 times. Options: retry, skip, or abort.`,
+              "correct",
+            );
+            this.taskManager.updateStep(task.id, step.id, { status: "failed", error: execResult.error });
+            break;
           }
         } else {
-          this.taskManager.updateStep(task.id, step.id, {
-            status: "completed",
-            output: execResult.value,
-          });
+          correctionTier = 0; // Reset on success
+          this.taskManager.updateStep(task.id, step.id, { status: "completed", output: execResult.value });
           this.callbacks.onStepComplete?.(step.description, execResult.value);
         }
 
         stepIndex++;
       }
 
-      // Phase 9: Finalize
+      // ── Verify ─────────────────────────────────────────────────────────────
+      this.stateMachine.transition("all_done");
       this.setPhase(task, "finalize");
+
       const stepResults = task.steps.map((s) => ({
         description: s.description,
         success: s.status === "completed",
@@ -190,6 +271,7 @@ export class AgentLoop {
       }));
 
       const verification = this.verifier.verifyTaskCompletion(taskDescription, stepResults);
+      this.stateMachine.transition(verification.passed ? "verify_pass" : "verify_partial");
 
       let finalSummary = verification.passed
         ? `Task completed successfully (${task.steps.length} steps)`
@@ -229,7 +311,23 @@ Provide a concise, conversational final reply to the user. If they just said a g
 
       this.taskManager.complete(task.id, taskResult);
 
-      // Phase 10: Persist memory
+      // ── Cache result ───────────────────────────────────────────────────────
+      if (verification.passed) {
+        this.cache.set(cacheKey, finalSummary);
+      }
+
+      // ── Reflect ────────────────────────────────────────────────────────────
+      const outcomes: StepOutcome[] = task.steps.map((s) => ({
+        stepId: s.id,
+        tool: s.toolName || "llm",
+        success: s.status === "completed",
+        output: s.output ? String(s.output).slice(0, 100) : undefined,
+        error: s.error ? s.error.message : undefined,
+      }));
+      this.reflector.reflect(outcomes);
+      this.stateMachine.transition("reflection_done");
+
+      // ── Persist memory ─────────────────────────────────────────────────────
       this.setPhase(task, "persist");
       await this.persistMemory(task);
 
@@ -240,12 +338,14 @@ Provide a concise, conversational final reply to the user. If they just said a g
         steps: task.steps.length,
         elapsed: `${elapsed}ms`,
         toolCalls: this.toolTrace.length,
+        tokensBudgetUsed: this.contextManager.getTotalSpent(),
       });
 
       this.callbacks.onTaskComplete?.(task);
       return ok(task);
     } catch (cause) {
       log.error("Agent loop crashed", { taskId: task.id, error: String(cause) });
+      this.stateMachine.transition("abort");
       return this.failTask(task, `Agent loop error: ${cause}`);
     }
   }

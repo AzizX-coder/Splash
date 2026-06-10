@@ -35,6 +35,7 @@ export class ProviderRouter {
   private capabilities = new Map<string, ProviderCapabilities>();
   private defaultProvider: string;
   private fallbackOrder: string[];
+  private stepUsage = new Map<string, { promptTokens: number; completionTokens: number; totalTokens: number }>();
 
   constructor(defaultProvider: string = "claude", fallbackOrder: string[] = []) {
     this.defaultProvider = defaultProvider;
@@ -176,6 +177,39 @@ export class ProviderRouter {
 
     scored.sort((a, b) => b.score - a.score);
     return scored[0]?.provider;
+  }
+
+  /** Record token usage for a specific step. */
+  recordStepUsage(stepId: string, usage: { promptTokens: number; completionTokens: number; totalTokens: number }): void {
+    const existing = this.stepUsage.get(stepId);
+    if (existing) {
+      existing.promptTokens += usage.promptTokens;
+      existing.completionTokens += usage.completionTokens;
+      existing.totalTokens += usage.totalTokens;
+    } else {
+      this.stepUsage.set(stepId, { ...usage });
+    }
+  }
+
+  /** Get token usage for a specific step. */
+  getStepUsage(stepId: string): { promptTokens: number; completionTokens: number; totalTokens: number } | undefined {
+    return this.stepUsage.get(stepId);
+  }
+
+  /** Get total token usage across all steps. */
+  getTotalUsage(): { promptTokens: number; completionTokens: number; totalTokens: number } {
+    let promptTokens = 0, completionTokens = 0, totalTokens = 0;
+    for (const usage of this.stepUsage.values()) {
+      promptTokens += usage.promptTokens;
+      completionTokens += usage.completionTokens;
+      totalTokens += usage.totalTokens;
+    }
+    return { promptTokens, completionTokens, totalTokens };
+  }
+
+  /** Reset all step usage tracking. */
+  resetUsage(): void {
+    this.stepUsage.clear();
   }
 }
 
