@@ -22,6 +22,7 @@ export interface RunRecord {
   toolCalls: number;
   steps: number;
   retries: number;
+  tokens?: number;
   pid?: number;
   error?: string;
   summary?: string;

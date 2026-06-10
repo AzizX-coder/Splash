@@ -185,6 +185,12 @@ function ResourcesPane({ record }: { record: RunRecord | undefined }): React.Rea
           <Text color="yellow">{record.toolCalls}</Text>
           <Text color="white">  retries: </Text>
           <Text color="yellow">{record.retries}</Text>
+          {record.tokens !== undefined && (
+             <>
+               <Text color="white">  tokens: </Text>
+               <Text color="yellow">{record.tokens}</Text>
+             </>
+          )}
           <Text color="white">  elapsed: </Text>
           <Text color="yellow">{elapsed}</Text>
         </>
@@ -230,6 +236,9 @@ function eventColor(e: RunEvent): string {
     case "RunCancelled": return "gray";
     case "PhaseChanged": return "cyan";
     case "ToolCalled": return "magenta";
+    case "CacheHit": return "green";
+    case "WebSearch": return "blue";
+    case "WebCrawl": return "cyan";
     case "LogLine": return e.level === "error" ? "red" : e.level === "warn" ? "yellow" : "white";
     default: return "white";
   }
@@ -246,5 +255,8 @@ function formatEvent(e: RunEvent): string {
     case "RunCompleted": return `[${t}] ✓ completed (${e.steps ?? 0} steps)`;
     case "RunFailed":    return `[${t}] ✗ failed: ${e.error}`;
     case "RunCancelled": return `[${t}] ⊘ cancelled${e.reason ? `: ${e.reason}` : ""}`;
+    case "CacheHit":     return `[${t}] ⚡ cache hit! bypassed execution`;
+    case "WebSearch":    return `[${t}] 🔍 searching web for: "${e.query}"`;
+    case "WebCrawl":     return `[${t}] 🕷️ crawling url: ${e.url.slice(0, 50)}...`;
   }
 }

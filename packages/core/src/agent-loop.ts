@@ -45,6 +45,7 @@ export interface AgentLoopCallbacks {
   onConfirmationRequired?: (action: string, risk: string) => Promise<boolean>;
   onTaskComplete?: (task: Task) => void;
   systemPersona?: string; // Inject character.md here
+  onCacheHit?: (key: string) => void;
 }
 
 /**
@@ -183,6 +184,7 @@ export class AgentLoop {
       if (cached) {
         this.stateMachine.transition("cache_hit");
         log.info("Cache hit, returning cached result");
+        this.callbacks.onCacheHit?.(cacheKey);
         const taskResult = { success: true, output: cached, summary: String(cached), artifacts: [] };
         this.taskManager.complete(task.id, taskResult);
         this.callbacks.onTaskComplete?.(task);
@@ -303,6 +305,7 @@ Provide a concise, conversational final reply to the user. If they just said a g
         success: verification.passed,
         output: stepResults,
         summary: finalSummary,
+        tokens: this.contextManager.getTotalSpent(),
         artifacts: task.steps
           .filter((s) => s.output)
           .map((s) => String(s.output))

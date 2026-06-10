@@ -100,6 +100,7 @@ export interface TaskResult {
   output: unknown;
   summary: string;
   artifacts?: string[];
+  tokens?: number;
 }
 
 // ─── Provider Types ──────────────────────────────────────────────────────────

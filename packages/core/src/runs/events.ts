@@ -58,6 +58,23 @@ export interface RunCancelled extends BaseEvent {
   reason?: string;
 }
 
+export interface CacheHit extends BaseEvent {
+  type: "CacheHit";
+  key: string;
+}
+
+export interface WebSearch extends BaseEvent {
+  type: "WebSearch";
+  query: string;
+  resultsCount: number;
+}
+
+export interface WebCrawl extends BaseEvent {
+  type: "WebCrawl";
+  url: string;
+  success: boolean;
+}
+
 export type RunEvent =
   | RunCreated
   | RunStarted
@@ -66,4 +83,7 @@ export type RunEvent =
   | LogLine
   | RunCompleted
   | RunFailed
-  | RunCancelled;
+  | RunCancelled
+  | CacheHit
+  | WebSearch
+  | WebCrawl;

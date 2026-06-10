@@ -141,6 +141,13 @@ export class RunManager extends EventEmitter {
         onToolCall: (tool: string, args: Record<string, unknown>) => {
           toolCalls++;
           this.writeEvent({ type: "ToolCalled", runId: id, at: now(), tool, args });
+          if (tool === "web-tool") {
+             if (args["action"] === "search" && args["query"]) {
+                this.writeEvent({ type: "WebSearch", runId: id, at: now(), query: String(args["query"]), resultsCount: 0 });
+             } else if ((args["action"] === "scrape" || args["action"] === "fetch") && args["url"]) {
+                this.writeEvent({ type: "WebCrawl", runId: id, at: now(), url: String(args["url"]), success: true });
+             }
+          }
         },
         onStepComplete: () => {
           const r = this.store.get(id);
@@ -148,6 +155,9 @@ export class RunManager extends EventEmitter {
         },
         onError: (error: string, phase: AgentPhase) => {
           this.writeEvent({ type: "LogLine", runId: id, at: now(), level: "error", text: `[${phase}] ${error}` });
+        },
+        onCacheHit: (key: string) => {
+          this.writeEvent({ type: "CacheHit", runId: id, at: now(), key });
         },
         onConfirmationRequired: async () => true, // background = auto-allow; foreground CLI wraps this separately
       });
@@ -162,6 +172,7 @@ export class RunManager extends EventEmitter {
         this.transition(id, "succeeded", {
           steps: t.steps.length,
           toolCalls,
+          tokens: t.result?.tokens,
           summary: t.result?.summary,
         });
         this.writeEvent({
