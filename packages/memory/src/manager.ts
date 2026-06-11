@@ -11,6 +11,7 @@ import { EpisodicMemory } from "./episodic.js";
 import { SemanticMemory } from "./semantic.js";
 import { UserProfile } from "./profile.js";
 import { SkillMemory } from "./skill-memory.js";
+import { TrashMemory, type TrashCategory } from "./trash.js";
 
 const log = createLogger("memory");
 
@@ -23,6 +24,7 @@ export class MemoryManager {
   public readonly semantic = new SemanticMemory();
   public readonly profile = new UserProfile();
   public readonly skills = new SkillMemory();
+  public readonly trash = new TrashMemory();
 
   constructor(private store: MemoryStore) {}
 
@@ -94,5 +96,24 @@ export class MemoryManager {
     const result = await this.store.search(query, limit);
     if (!result.ok) return [];
     return result.value.map((e) => `[${e.category}:${e.key}] ${e.value}`);
+  }
+
+  /** Get a summary of items in trash by category */
+  async trashSummary(): Promise<Record<TrashCategory | "total", number>> {
+    const entries = this.trash.list();
+    const counts = {
+      adversarial: 0,
+      noisy: 0,
+      failed: 0,
+      overshoot: 0,
+      unsafe: 0,
+      total: entries.length,
+    };
+    for (const e of entries) {
+      if (counts[e.category] !== undefined) {
+        counts[e.category]++;
+      }
+    }
+    return counts;
   }
 }

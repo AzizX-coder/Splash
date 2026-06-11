@@ -147,6 +147,7 @@ export interface CompletionRequest {
   maxTokens?: number;
   stop?: string[];
   model?: string;
+  responseFormat?: { type: "json_object" | "text" };
 }
 
 export interface CompletionResponse {

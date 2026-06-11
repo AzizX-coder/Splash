@@ -27,6 +27,7 @@ export interface GlobalConfigShape {
   preset?: "fast" | "balanced" | "safe";
   apiKeys?: Record<string, string>;
   bots?: Record<string, Record<string, string>>;
+  mcpServers?: Record<string, { command: string; args?: string[]; env?: Record<string, string> }>;
   cli?: {
     style?: "splash" | "hydro" | "edge" | "silent";
     showThinking?: boolean;

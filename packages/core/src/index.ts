@@ -16,3 +16,4 @@ export { Executor } from "./executor.js";
 export { ContextManager } from "./context-manager.js";
 export { ResultCache } from "./cache.js";
 export { Reflector } from "./reflector.js";
+export { PluginManager, type PluginConfig } from "./plugins.js";

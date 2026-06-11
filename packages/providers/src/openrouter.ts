@@ -13,7 +13,8 @@ export class OpenRouterProvider extends OpenAIProvider {
   override readonly name = "openrouter";
 
   constructor(apiKey?: string, opts?: { defaultModel?: string }) {
-    super(apiKey || process.env.OPENROUTER_API_KEY || "", {
+    super(apiKey, {
+      name: "openrouter",
       baseUrl: "https://openrouter.ai/api/v1",
       defaultModel: opts?.defaultModel || "moonshotai/kimi-k2",
     });

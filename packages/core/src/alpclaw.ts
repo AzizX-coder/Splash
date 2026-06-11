@@ -33,6 +33,12 @@ import {
   GitHubConnector,
   MessagingConnector,
   WebhookConnector,
+  GmailConnector,
+  SmsConnector,
+  TelegramConnector,
+  DiscordConnector,
+  SlackConnector,
+  WhatsappConnector,
 } from "@alpclaw/connectors";
 import {
   SkillRegistry,
@@ -62,6 +68,16 @@ import {
   TaskQueueSkill,
   ProjectGeneratorSkill,
   DocumentGeneratorSkill,
+  GmailSkill,
+  SmsSkill,
+  TelegramSkill,
+  DiscordSkill,
+  SlackSkill,
+  WebhookSkill,
+  ImageGenSkill,
+  TtsSkill,
+  PdfReaderSkill,
+  SpreadsheetEditorSkill,
 } from "@alpclaw/skills";
 import {
   FsTool,
@@ -166,6 +182,12 @@ export class AlpClaw {
     this.connectors.register(new GitHubConnector(""));
     this.connectors.register(new MessagingConnector());
     this.connectors.register(new WebhookConnector());
+    this.connectors.register(new GmailConnector());
+    this.connectors.register(new SmsConnector());
+    this.connectors.register(new TelegramConnector());
+    this.connectors.register(new DiscordConnector());
+    this.connectors.register(new SlackConnector());
+    this.connectors.register(new WhatsappConnector());
 
     // ── Skills ─────────────────────────────────────────────────────────────
     this.skills = new SkillRegistry();
@@ -195,6 +217,16 @@ export class AlpClaw {
     this.skills.register(new TaskQueueSkill());
     this.skills.register(new ProjectGeneratorSkill());
     this.skills.register(new DocumentGeneratorSkill());
+    this.skills.register(new GmailSkill());
+    this.skills.register(new SmsSkill());
+    this.skills.register(new TelegramSkill());
+    this.skills.register(new DiscordSkill());
+    this.skills.register(new SlackSkill());
+    this.skills.register(new WebhookSkill());
+    this.skills.register(new ImageGenSkill());
+    this.skills.register(new TtsSkill());
+    this.skills.register(new PdfReaderSkill());
+    this.skills.register(new SpreadsheetEditorSkill());
     
     // Tools
     this.skills.register(new FsTool());

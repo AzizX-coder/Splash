@@ -9,131 +9,109 @@
    ╚══════╝╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝
 ```
 
-### Splash — Autonomous Agent Platform
+# Splash: Agent Engine for Agencies
 
-*A production-grade, self-improving, multi-provider agent platform that is simple, fast, beautiful, and safe.*
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat-square&logo=typescript&logoColor=white)]()
+[![License](https://img.shields.io/badge/License-MIT-0e7490?style=flat-square)]()
+[![Build](https://img.shields.io/badge/Build-Passing-22c55e?style=flat-square)]()
+[![Tests](https://img.shields.io/badge/Tests-125%20Passing-22c55e?style=flat-square)]()
+[![Version](https://img.shields.io/badge/Version-3.1.1-blue?style=flat-square)]()
 
-[![node](https://img.shields.io/badge/node-%E2%89%A520-2dd4bf?style=flat-square)]()
-[![tests](https://img.shields.io/badge/tests-93%20passing-22c55e?style=flat-square)]()
-[![license](https://img.shields.io/badge/license-MIT-0e7490?style=flat-square)]()
+*A production-ready, self-improving, multi-provider autonomous agent engine built for reliability, precision, and agency workflows.*
 
 </div>
 
 ---
 
-## 60-Second Demo
+## ⚡ What is Splash?
 
-Splash is a **local-first autonomous agent** you call from any directory. One global config file, one command — `splash` — and it builds, edits, debugs, runs shells, reads the web, drives bots, whatever the task needs.
+Splash Core (v3.1.1) is an **autonomous execution engine**—not a chatbot. It is a strictly contract-based, multi-modal AI system that executes real-world tasks with precision, automatically audits its own work, and evolves its memory layers from every operation. Built for developers and agencies looking for deterministic outcomes over conversational fluff.
+
+## 🌟 Why Splash?
+
+- **Contract-First Execution:** Every multi-step task generates a typed JSON execution contract outlining steps, token budgets, and verification criteria before execution begins.
+- **Advanced Memory Architecture:** A robust 4-layer memory system (Working, Episodic, Semantic, Procedural) with a dedicated **Trash Memory** quarantine to prevent adversarial noise from polluting core skills.
+- **Safety as a First-Class Concern:** Four configurable safety tiers (permissive, standard, strict, paranoid) physically block destructive actions and leakages, validated by independent safety filters.
+- **Instant Fast-Paths:** Deterministic sub-100ms bypasses for common operations, sidestepping the LLM loop entirely to save tokens and time.
+- **Multi-Provider Arbitration:** Native routing to OpenRouter, Claude, OpenAI, Gemini, DeepSeek, and local Ollama deployments with automatic rate-limit fallbacks.
+
+## 📦 Install
+
+You can install Splash with a single curl command on macOS and Linux:
 
 ```bash
-# 1. Install via npm (works natively on Windows, macOS, and Linux)
-npm install -g splash-agent
+curl -fsSL https://raw.githubusercontent.com/splash-agent/splash/main/scripts/install.sh | bash
+```
 
-# 2. Configure (30 seconds)
-splash init                 # pick provider, paste key, pick model, pick safety
+For Windows PowerShell and manual installation methods, see [docs/INSTALL.md](docs/INSTALL.md).
 
-# 3. Go
-splash "summarize this folder"
+**Initialize Configuration:**
+```bash
+splash init
+```
+
+## 🚀 Quickstart
+
+Splash natively supports execution directly from the command line:
+
+### 1. Instant Fast-Path Tasks
+```bash
+# Bypass the LLM entirely for deterministic system commands
+splash "list files in src/"
+```
+
+### 2. Autonomous Agent Loops
+```bash
+# Engages the full contract builder and execution loop
+splash "debug the memory leak in packages/core/src/agent-loop.ts"
+```
+
+### 3. Background Detached Runs
+```bash
+# Detaches execution to the daemon so you can track it later
 splash "build a FastAPI todo service" --background
-splash tui                  # live dashboard
 ```
 
-No `pnpm dev`. No per-project `.env`. Just `splash`.
+## 🛠️ Features
+
+### Core Engine
+- **Contract Builder:** Generates deterministic execution plans (`packages/core/src/contract-builder.ts`).
+- **State Machine:** Strongly-typed execution lifecycle (`packages/core/src/state-machine.ts`).
+- **Reflector:** Evaluates executed steps and extracts permanent learnings, scoring quality via an automated heuristic.
+
+### Memory Systems
+- **Semantic Memory:** Long-term storage of validated facts.
+- **Episodic Memory:** Context tracking across sessions.
+- **Trash Memory:** Quarantines failed, noisy, or adversarial prompts to prevent skill pollution.
+
+### Skills
+- 36 Built-in foundational skills loaded dynamically via registry.
+- Heavy dependencies dynamically imported to preserve <100ms startup times.
+
+### Connectors
+- **Real:** Filesystem, Webhook, Terminal, Browser, HTTP.
+- **Configuration Available / Coming Soon:** Gmail, SMS, Telegram, Discord, Slack, WhatsApp. *(Note: these gateway connectors currently validate config but await full real-world REST API mappings).*
+
+### CLI / TUI
+- Fully-featured non-interactive mode.
+- Interactive `ink`-based Terminal User Interface (`splash tui`) for real-time state monitoring.
+
+### Providers
+- Native API connectors for Anthropic, OpenAI, Google Gemini, Groq, Mistral, Together, DeepSeek, and Ollama.
+
+## 🗺️ Roadmap
+
+- **Done:** V3 Engine (Contract Execution, Memory Layers, Safety Engine, Trash Memory).
+- **In Progress:** Transitioning simulated gateway connectors (Discord, Telegram, Slack) to real REST/WebSocket API implementations.
+- **Planned:** Full MCP (Model Context Protocol) plugin integration for cross-agent compatibility.
+
+## 📚 Documentation
+- **[docs/COMMANDS.md](docs/COMMANDS.md)** — Complete CLI reference manual.
+- **[docs/INSTALL.md](docs/INSTALL.md)** — Detailed OS-specific installation instructions.
+- **[docs/VERIFICATION.md](docs/VERIFICATION.md)** — Test suite and operational proof records.
+
+## 📜 License
+MIT License. See [LICENSE](LICENSE) for details.
 
 ---
-
-## Provider Matrix
-
-| Provider | Access | Models | Free Tier? | Best For |
-|---|---|---|---|---|
-| **OpenRouter** | API Key | 300+ | Yes | Massive catalog, cheap/free models, fast testing |
-| **Claude** | API Key | Opus, Sonnet, Haiku | No | Coding, complex reasoning, large context |
-| **OpenAI** | API Key | GPT-4o, o3, o4-mini | No | General purpose, reliable tool calling |
-| **Gemini** | API Key | 2.5 Pro, 2.5 Flash | Yes | Huge context windows, fast |
-| **DeepSeek** | API Key | R1, V3 | Yes | Strong reasoning, extremely affordable |
-| **Ollama** | Local | Llama3, Mistral, Qwen | Yes | Complete privacy, offline use, no API keys |
-
----
-
-## Command Reference
-
-| Command | What it does |
-|---|---|
-| **Run** | |
-| `splash "do X"` | One-shot task, foreground |
-| `splash "do X" --background` | Detached background run; returns an id |
-| **Config** | |
-| `splash config list/get/set/doctor/preset` | Manage system configuration |
-| `splash config set-key <provider> <key>` | Save a provider API key |
-| `splash config set-bot <bot> <field> <val>`| Save a bot credential |
-| **Providers** | |
-| `splash providers list` | Show configured providers + health status |
-| `splash providers test <name>` | Ping provider API, report latency |
-| **Skills** | |
-| `splash skills list` | Manage skills |
-| **Memory** | |
-| `splash memory list/search/export` | Memory operations |
-| **Runs** | |
-| `splash runs list/logs/stop/retry/attach` | Run management |
-| `splash runs show <id>` | Full JSON record |
-| **System** | |
-| `splash init` | 5-step setup wizard |
-| `splash maintenance [--apply]` | Self-check: config drift, skill failures, provider health |
-| `splash self-improve` | Analyze recent runs, write learnings |
-| **Advanced** | |
-| `splash voice` | Interactive STT/TTS loop |
-| `splash swarm <task>` | Spawns parallel sub-agents to synthesize an answer |
-| `splash antigravity start` | Starts background polling daemon |
-
-### Platform Bots
-
-`splash telegram` · `splash slack` · `splash whatsapp` · `splash messenger` · `splash discord`
-
-Each reads its credentials from `~/.splash/config.json` (or env). Webhook ports: Slack 3001, WhatsApp 3002, Messenger 3003, Discord 3004. Telegram uses long-poll.
-
----
-
-## The TUI
-
-```
-┌─ Splash · Autonomous Agent Dashboard ─────── ≈ ─┐
-│                                                   │
-│ ┌── Runs ───┐ ┌── Task Graph ────────────────┐   │
-│ │ ▸ ◌ build │ │ ✓ intake  ✓ plan  ◉ execute  │   │
-│ │   ✓ test  │ │ ○ verify  ○ finalize         │   │
-│ │   ✗ scan  │ └──────────────────────────────┘   │
-│ │           │ ┌── Resources ─────────────────┐   │
-│ │           │ │ steps 4 · tools 12 · 8.3s    │   │
-│ │           │ └──────────────────────────────┘   │
-│ │           │ ┌── Live Logs ─────────────────┐   │
-│ │           │ │ 14:22:11 phase → execute     │   │
-│ │           │ │ 14:22:12 ⚡ fs.read_file     │   │
-│ │           │ │ 14:22:14 ⚡ terminal.run     │   │
-│ │           │ └──────────────────────────────┘   │
-│ └───────────┘                                     │
-│ ↑/↓ select · s stop · r retry · p pause · q quit │
-└───────────────────────────────────────────────────┘
-```
-
-**Shortcuts:** `↑/↓` select · `s` stop · `r` retry · `p` pause/resume · `l` reload logs · `q` quit
-
----
-
-## Configuration
-
-Config precedence (lowest → highest):
-
-1. Schema defaults
-2. `~/.splash/config.json`
-3. `.env` in cwd + `SPLASH_*` env vars
-4. Explicit `loadConfig()` overrides
-
-**Env var names:** `SPLASH_DEFAULT_PROVIDER`, `SPLASH_DEFAULT_MODEL`, `SPLASH_SAFETY_MODE`, `SPLASH_MEMORY_PATH`, `SPLASH_LOG_LEVEL`.
-
-**Provider keys:** `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY`, `OLLAMA_BASE_URL`.
-
----
-
-## License
-
-MIT
+*Built with precision for the autonomous future.*

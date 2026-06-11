@@ -17,7 +17,7 @@
 
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import { AlpClaw, RunManager, runWorker } from "@alpclaw/core";
+import { AlpClaw, RunManager, runWorker, PluginManager } from "@alpclaw/core";
 import type { AgentPhase, Task } from "@alpclaw/utils";
 import { renderBanner, ripple, startLoader } from "@alpclaw/utils";
 import {
@@ -36,6 +36,7 @@ import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as process from "node:process";
+import * as os from "node:os";
 import { marked } from "marked";
 import { markedTerminal } from "marked-terminal";
 
@@ -54,16 +55,16 @@ try {
 }
 
 const PHASE_LABELS: Record<AgentPhase, string> = {
-  intake: "Receiving task",
-  understand: "Understanding intent",
-  plan: "Architecting plan",
-  context_fetch: "Accessing memory",
-  tool_select: "Selecting capabilities",
-  execute: "Executing",
-  verify: "Verifying results",
-  correct: "Self-correcting",
-  finalize: "Finalizing",
-  persist: "Writing to persistent memory",
+  intake: "[INTAKE] Receiving task",
+  understand: "[UNDERSTAND] Understanding intent",
+  plan: "[PLAN] Architecting plan",
+  context_fetch: "[CONTEXT] Accessing memory",
+  tool_select: "[TOOL] Selecting capabilities",
+  execute: "[EXEC] Executing",
+  verify: "[VERIFY] Verifying results",
+  correct: "[CORRECT] Self-correcting",
+  finalize: "[FINALIZE] Finalizing",
+  persist: "[PERSIST] Writing to persistent memory",
 };
 
 const BOT_SPECS: Record<
@@ -110,8 +111,8 @@ async function main() {
   const KNOWN_COMMANDS = [
     "version", "help", "init", "setup", "config", "chat", "telegram", "slack", 
     "whatsapp", "messenger", "discord", "runs", "tui", "dashboard", "self-improve", 
-    "providers", "skills", "memory", "maintenance", "voice", "swarm", "antigravity", 
-    "run", "doctor", "browser", "self-modify", "self-rollback"
+    "providers", "skills", "connectors", "memory", "maintenance", "voice", "swarm", "antigravity", 
+    "run", "doctor", "browser", "self-modify", "self-rollback", "plugins"
   ];
 
   if (!KNOWN_COMMANDS.includes(cmd)) {
@@ -186,6 +187,9 @@ async function main() {
     case "skills":
       await runSkills(args.slice(1));
       return;
+    case "connectors":
+      await runConnectors(args.slice(1));
+      return;
     case "browser":
       await runBrowser(args.slice(1));
       return;
@@ -203,6 +207,9 @@ async function main() {
       return;
     case "antigravity":
       await runAntigravity(args.slice(1));
+      return;
+    case "plugins":
+      await runPlugins(args.slice(1));
       return;
     case "_worker":
       // internal: spawned by background runs to execute a pre-allocated run id
@@ -247,6 +254,7 @@ function printHelp(): void {
       `  ${pc.cyan("Config   ")} ${pc.dim("|")} config list/get/set/set-key/set-bot/doctor/preset`,
       `  ${pc.cyan("Providers")} ${pc.dim("|")} providers list, providers test <name>`,
       `  ${pc.cyan("Skills   ")} ${pc.dim("|")} skills list`,
+      `  ${pc.cyan("Plugins  ")} ${pc.dim("|")} plugins list/enable/disable`,
       `  ${pc.cyan("Memory   ")} ${pc.dim("|")} memory list/search/export`,
       `  ${pc.cyan("Runs     ")} ${pc.dim("|")} runs list/logs/stop/retry/attach/show`,
       `  ${pc.cyan("System   ")} ${pc.dim("|")} init, maintenance [--apply], self-improve`,
@@ -265,6 +273,11 @@ function printHelp(): void {
 // ──────────────────────────────────────────────────────────────────────────
 
 async function runInit() {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    console.error(pc.red("[ERR] `splash init` requires an interactive terminal."));
+    process.exit(1);
+  }
+
   console.log(renderBanner({ subtitle: "Setup" }));
   p.intro(pc.bgCyan(pc.black(" SPLASH INIT V2 ")));
   p.log.message("Let's set up your Splash environment in 8 steps.");
@@ -788,6 +801,46 @@ async function checkFastPath(prompt: string): Promise<boolean> {
     return path.resolve(process.cwd(), p);
   };
 
+  // 0) List / Special commands
+  if (lowerPrompt === "skills list") {
+    await runSkills(["list"]);
+    return true;
+  }
+  if (lowerPrompt === "connectors list") {
+    await runConnectors(["list"]);
+    return true;
+  }
+  if (lowerPrompt.startsWith("connectors test ")) {
+    await runConnectors(["test", originalPrompt.slice(16).trim()]);
+    return true;
+  }
+  if (lowerPrompt === "providers list") {
+    await runProviders(["list"]);
+    return true;
+  }
+  if (lowerPrompt === "plugins list") {
+    await runPlugins(["list"]);
+    return true;
+  }
+  if (lowerPrompt.startsWith("memory search ")) {
+    await runMemory(["search", originalPrompt.slice(14).trim()]);
+    return true;
+  }
+  if (lowerPrompt === "cache stats") {
+    try {
+      const p = path.join(os.homedir(), ".splash", "cache.jsonl");
+      if (!fs.existsSync(p)) {
+        console.log(pc.green(`[OK] cache: 0 entries`));
+      } else {
+        const lines = fs.readFileSync(p, 'utf-8').split('\n').filter(l => l.trim().length > 0);
+        console.log(pc.green(`[OK] cache: ${lines.length} entries stored`));
+      }
+    } catch {
+      console.log(pc.green(`[OK] cache: 0 entries`));
+    }
+    return true;
+  }
+
   // 1 & 2) Create file
   // "create [a] [python|js|ts] [file|code] [named] <filename>"
   // "make <filename>"
@@ -797,6 +850,8 @@ async function checkFastPath(prompt: string): Promise<boolean> {
   }
   
   if (createMatch) {
+    console.log(renderBanner({ subtitle: "Fast-Path Execution", compact: true }));
+    console.log(pc.green("[FAST] Phase: fast-path"));
     const ext = createMatch[1] || "";
     let filename = createMatch[createMatch.length - 1]!;
     if (filename.includes(" ")) {
@@ -818,6 +873,8 @@ async function checkFastPath(prompt: string): Promise<boolean> {
   // "read [file] <filename>", "show <filename>"
   const readMatch = lowerPrompt.match(/^(?:read|show|cat)\s+(?:file\s+)?([\w\-./\\]+(?:\.\w+)?)$/i);
   if (readMatch) {
+    console.log(renderBanner({ subtitle: "Fast-Path Execution", compact: true }));
+    console.log(pc.green("[FAST] Phase: fast-path"));
     const fp = resolvePath(readMatch[1]!);
     try {
       const txt = fs.readFileSync(fp, "utf-8");
@@ -833,6 +890,8 @@ async function checkFastPath(prompt: string): Promise<boolean> {
   // "list [all] [folders|files] [in] <path>", "ls <path>", "dir <path>"
   let listMatch = lowerPrompt.match(/^(?:list|ls|dir)\s+(?:all\s+)?(?:folders|files)?\s*(?:in|for)?\s*([\w\-./\\]*)$/i);
   if (listMatch) {
+    console.log(renderBanner({ subtitle: "Fast-Path Execution", compact: true }));
+    console.log(pc.green("[FAST] Phase: fast-path"));
     const target = listMatch[1] ? resolvePath(listMatch[1]) : process.cwd();
     try {
       const entries = fs.readdirSync(target, { withFileTypes: true });
@@ -852,6 +911,8 @@ async function checkFastPath(prompt: string): Promise<boolean> {
   // "go to <path> and list", "go to <path> and show"
   const goToMatch = lowerPrompt.match(/^go\s+to\s+([\w\-./\\]+)\s+and\s+(?:list|show)$/i);
   if (goToMatch) {
+    console.log(renderBanner({ subtitle: "Fast-Path Execution", compact: true }));
+    console.log(pc.green("[FAST] Phase: fast-path"));
     const target = resolvePath(goToMatch[1]!);
     try {
       const entries = fs.readdirSync(target, { withFileTypes: true });
@@ -871,6 +932,8 @@ async function checkFastPath(prompt: string): Promise<boolean> {
   // "search [the web] for <query>"
   const searchMatch = originalPrompt.match(/^search(?:\s+the\s+web)?\s+for\s+(.+)$/i);
   if (searchMatch) {
+    console.log(renderBanner({ subtitle: "Fast-Path Execution", compact: true }));
+    console.log(pc.green("[FAST] Phase: fast-path"));
     const query = searchMatch[1]!;
     console.log(`[OK] Searching web for: ${query}`);
     // Simulate web search or trigger fast-path
@@ -881,6 +944,8 @@ async function checkFastPath(prompt: string): Promise<boolean> {
   // "run [the] command <cmd>", "execute <cmd>"
   const runMatch = originalPrompt.match(/^(?:run(?:\s+the)?\s+command|execute)\s+(.+)$/i);
   if (runMatch) {
+    console.log(renderBanner({ subtitle: "Fast-Path Execution", compact: true }));
+    console.log(pc.green("[FAST] Phase: fast-path"));
     const cmd = runMatch[1]!;
     try {
       const { spawnSync } = require("child_process");
@@ -897,6 +962,8 @@ async function checkFastPath(prompt: string): Promise<boolean> {
   // "write <text> to <file>", "put <text> into <file>"
   const writeMatch = originalPrompt.match(/^(?:write|put)\s+(.+?)\s+(?:to|into)\s+(?:file\s+)?([\w\-./\\]+(?:\.\w+)?)$/i);
   if (writeMatch) {
+    console.log(renderBanner({ subtitle: "Fast-Path Execution", compact: true }));
+    console.log(pc.green("[FAST] Phase: fast-path"));
     const content = writeMatch[1]!;
     const fp = resolvePath(writeMatch[2]!);
     try {
@@ -1312,8 +1379,66 @@ async function runSkills(args: string[]): Promise<void> {
     return;
   }
 
+  if (sub === "run") {
+    const name = args[1];
+    if (!name) {
+      console.error(pc.red("Usage: splash skills run <name> [params...]"));
+      return;
+    }
+    // Skills run is handled via the agent loop
+    console.log(pc.dim(`To run a skill directly, use: splash run "use ${name} skill"`));
+    return;
+  }
+
   console.error(pc.red(`Unknown subcommand: skills ${sub}`));
-  console.log(pc.dim("  Available: list"));
+  console.log(pc.dim("  Available: list, run <name> [params...]"));
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Connectors
+// ──────────────────────────────────────────────────────────────────────────
+
+async function runConnectors(args: string[]): Promise<void> {
+  const sub = args[0] || "list";
+
+  if (sub === "list") {
+    const alpclaw = await buildAgent();
+    const connectors = alpclaw.connectors.list();
+    console.log(pc.bold(`\n  Registered Connectors\n`));
+    for (const conn of connectors) {
+      console.log(`  ${pc.cyan(conn.name.padEnd(15))} ${pc.dim(conn.category)}`);
+    }
+    console.log();
+    return;
+  }
+
+  if (sub === "test") {
+    const name = args[1];
+    if (!name) {
+      console.error(pc.red("Usage: splash connectors test <name>"));
+      return;
+    }
+    const alpclaw = await buildAgent();
+    const conn = alpclaw.connectors.get(name);
+    if (!conn) {
+      console.error(pc.red(`Connector '${name}' not found.`));
+      return;
+    }
+    try {
+      const ok = await conn.isAvailable();
+      if (ok) {
+        console.log(pc.green(`[OK] Connector ${name} is available and configured.`));
+      } else {
+        console.error(pc.red(`[ERR] Not configured: Connector ${name} requires setup.`));
+      }
+    } catch (e: any) {
+      console.error(pc.red(`[ERR] Connector ${name} test failed: ${e.message}`));
+    }
+    return;
+  }
+
+  console.error(pc.red(`Unknown subcommand: connectors ${sub}`));
+  console.log(pc.dim("  Available: list, test <name>"));
 }
 
 async function runBrowser(args: string[]): Promise<void> {
@@ -1472,8 +1597,63 @@ async function runMemory(args: string[]): Promise<void> {
     return;
   }
 
+  if (sub === "trash") {
+    const trashSub = args[1];
+    const { MemoryManager, FileMemoryStore } = await import("@alpclaw/memory");
+    const manager = new MemoryManager(new FileMemoryStore(memDir));
+    
+    if (trashSub === "list") {
+      const limit = args[2] ? parseInt(args[2], 10) : 50;
+      const entries = manager.trash.list(limit);
+      if (entries.length === 0) {
+        console.log(pc.green("0 entries"));
+        return;
+      }
+      for (const e of entries) {
+        console.log(`[${e.category}] ${e.id} - ${e.reason} (${e.source})`);
+      }
+      return;
+    }
+    if (trashSub === "empty") {
+      manager.trash.empty();
+      return;
+    }
+    if (trashSub === "restore") {
+      const id = args[2];
+      if (!id) {
+        console.error(pc.red("Usage: splash memory trash restore <id>"));
+        return;
+      }
+      const restored = manager.trash.restore(id);
+      if (restored) {
+        await manager.semantic.set(`restored:${restored.id}`, restored.data);
+      } else {
+        console.error(pc.red(`Entry ${id} not found in trash`));
+      }
+      return;
+    }
+    console.error(pc.red(`Unknown trash subcommand: ${trashSub}`));
+    return;
+  }
+
+  if (sub === "stats") {
+    const { MemoryManager, FileMemoryStore } = await import("@alpclaw/memory");
+    const manager = new MemoryManager(new FileMemoryStore(memDir));
+    const semanticRes = await manager.semantic.getAll();
+    const semanticCount = semanticRes.length;
+    const trashStats = await manager.trashSummary();
+    
+    console.log(pc.cyan("Memory Stats"));
+    console.log(`Main Memory (Semantic): ${semanticCount} entries`);
+    console.log(`Trash Memory: ${trashStats.total} entries`);
+    for (const [cat, count] of Object.entries(trashStats)) {
+      if (cat !== "total") console.log(`  ${cat}: ${count}`);
+    }
+    return;
+  }
+
   console.error(pc.red(`Unknown subcommand: memory ${sub}`));
-  console.log(pc.dim("  Available: list, search <query>, export [file], import <file>, clear"));
+  console.log(pc.dim("  Available: list, search <query>, export [file], import <file>, clear, trash <list|empty|restore>, stats"));
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -1784,6 +1964,11 @@ async function runOneShot(alpclaw: AlpClaw, description: string, persona?: strin
   const cfg = readGlobalConfig();
   const style = cfg.cli?.style || "splash";
   
+  if (style !== "silent") {
+    console.log(renderBanner({ subtitle: "Agent Execution" }));
+    printStatusLine(alpclaw);
+  }
+  
   let s = p.spinner();
   let currentPhase = "";
   let lastTool = "";
@@ -1824,6 +2009,11 @@ async function runOneShot(alpclaw: AlpClaw, description: string, persona?: strin
       }
     },
     onConfirmationRequired: async (action: string, risk: string): Promise<boolean> => {
+      if (!process.stdin.isTTY || !process.stdout.isTTY) {
+        if (style === "splash") p.log.warn(`${pc.bgYellow(pc.black(" WARN "))} Auto-approving non-interactive action: ${action}`);
+        else console.warn(`${pc.yellow("[WARN]")} Auto-approving non-interactive action: ${action}`);
+        return true;
+      }
       if (style === "splash") s.stop("Safety engine paused execution.");
       const allowed = await p.confirm({
         message: `${pc.bgYellow(pc.black(" WARN "))} ${pc.bold(action)} (risk: ${pc.red(risk)}). Allow?`,
@@ -1882,7 +2072,61 @@ function abort(): never {
   process.exit(0);
 }
 
-main().catch((err) => {
-  console.error(pc.bgRed(pc.white(" FATAL ")) + `\n\n${err?.stack || err}`);
-  process.exit(1);
-});
+// ──────────────────────────────────────────────────────────────────────────
+// Plugins subcommands
+// ──────────────────────────────────────────────────────────────────────────
+async function runPlugins(args: string[]): Promise<void> {
+  const sub = args[0];
+  const pm = new PluginManager();
+
+  if (!sub || sub === "list") {
+    const plugins = pm.listPlugins();
+    console.log(pc.cyan(pc.bold("Installed Plugins (MCP Servers):")));
+    if (plugins.length === 0) {
+      console.log(pc.dim("  No plugins installed."));
+    } else {
+      for (const plugin of plugins) {
+        const status = plugin.enabled ? pc.green("[enabled]") : pc.gray("[disabled]");
+        console.log(`  ${status} ${plugin.name} (${plugin.format}) - command: ${plugin.configPath}`);
+      }
+    }
+    return;
+  }
+
+  if (sub === "enable") {
+    const name = args[1];
+    if (!name) return failUsage("splash plugins enable <name>");
+    const res = pm.enablePlugin(name);
+    if (!res.ok) {
+      console.error(pc.red(`[ERR] ${res.error.message}`));
+      process.exit(1);
+    }
+    console.log(pc.green(`[OK] Plugin ${name} enabled.`));
+    return;
+  }
+
+  if (sub === "disable") {
+    const name = args[1];
+    if (!name) return failUsage("splash plugins disable <name>");
+    const res = pm.disablePlugin(name);
+    if (!res.ok) {
+      console.error(pc.red(`[ERR] ${res.error.message}`));
+      process.exit(1);
+    }
+    console.log(pc.green(`[OK] Plugin ${name} disabled.`));
+    return;
+  }
+
+  failUsage("splash plugins <list|enable|disable> [name]");
+}
+
+main()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    if (process.env.DEBUG) {
+      console.error(pc.bgRed(pc.white(" FATAL ")) + `\n\n${err?.stack || err}`);
+    } else {
+      console.error(pc.red(`[ERR] ${err instanceof Error ? err.message : String(err)}`));
+    }
+    process.exit(1);
+  });

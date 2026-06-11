@@ -26,7 +26,7 @@ describe("Hermes-Grade Memory Expansion", () => {
 
   describe("EpisodicMemory", () => {
     it("should append and retrieve last N messages", async () => {
-      const memory = new EpisodicMemory();
+      const memory = new EpisodicMemory(TEST_DIR);
       memory.append("sess1", { role: "user", content: "hello", timestamp: "123" });
       memory.append("sess1", { role: "bot", content: "hi", timestamp: "124" });
       
@@ -40,7 +40,7 @@ describe("Hermes-Grade Memory Expansion", () => {
     });
 
     it("should search messages across sessions", async () => {
-      const memory = new EpisodicMemory();
+      const memory = new EpisodicMemory(TEST_DIR);
       memory.append("sess1", { role: "user", content: "find this string", timestamp: "1" });
       memory.append("sess2", { role: "user", content: "some other string", timestamp: "2" });
       memory.append("sess2", { role: "bot", content: "find this too", timestamp: "3" });

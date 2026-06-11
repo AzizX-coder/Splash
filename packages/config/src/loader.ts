@@ -15,8 +15,16 @@ export type AlpClawConfigOverrides = DeepPartial<AlpClawConfig>;
  *   3. .env / process env
  *   4. explicit overrides passed to loadConfig()
  */
+import * as fs from "node:fs";
+import { globalConfigPath } from "./global-store.js";
+import { ZodError } from "zod";
+
 export function loadConfig(overrides?: AlpClawConfigOverrides): Result<AlpClawConfig> {
   loadDotenv();
+
+  if (!fs.existsSync(globalConfigPath())) {
+    console.error("[ERR] No config at ~/.splash/config.json — run splash init");
+  }
 
   try {
     const global = readGlobalConfig();
@@ -28,6 +36,8 @@ export function loadConfig(overrides?: AlpClawConfigOverrides): Result<AlpClawCo
         apiKeys: global.apiKeys || {},
       },
       safety: { mode: global.safetyMode },
+      bots: global.bots || {},
+      mcpServers: global.mcpServers || {},
     };
 
     const envGet = (key: string): string | undefined =>
@@ -50,6 +60,11 @@ export function loadConfig(overrides?: AlpClawConfigOverrides): Result<AlpClawCo
     const parsed = ConfigSchema.parse(cleaned);
     return ok(parsed);
   } catch (cause) {
+    if (cause instanceof ZodError) {
+      const issues = cause.issues.map(i => `${i.path.join('.')}: ${i.message}`).join(', ');
+      console.error(`[ERR] Invalid config: ${issues}`);
+      return err(createError("config", `Invalid config: ${issues}`, { cause }));
+    }
     return err(createError("config", "Failed to load configuration", { cause }));
   }
 }

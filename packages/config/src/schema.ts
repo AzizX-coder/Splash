@@ -25,6 +25,12 @@ export const ConfigSchema = z.object({
   logging: z.object({
     level: z.enum(["debug", "info", "warn", "error"]).default("info"),
   }),
+  bots: z.record(z.string(), z.record(z.string(), z.string())).default({}),
+  mcpServers: z.record(z.string(), z.object({
+    command: z.string(),
+    args: z.array(z.string()).default([]),
+    env: z.record(z.string(), z.string()).optional()
+  })).default({})
 });
 
 export type AlpClawConfig = z.infer<typeof ConfigSchema>;

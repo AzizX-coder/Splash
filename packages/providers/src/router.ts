@@ -118,8 +118,27 @@ export class ProviderRouter {
       
       return result; // Success
     }
-
     return err(createError("provider", "All providers busy. Try again in 1 minute."));
+  }
+
+  /**
+   * Route a step execution and track token usage automatically.
+   */
+  async routeStep(
+    stepId: string,
+    request: CompletionRequest,
+    criteria?: RoutingCriteria,
+  ): Promise<Result<CompletionResponse>> {
+    const result = await this.route(request, criteria);
+    if (result.ok && result.value.usage) {
+      const prev = this.stepUsage.get(stepId) || { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+      this.stepUsage.set(stepId, {
+        promptTokens: prev.promptTokens + result.value.usage.promptTokens,
+        completionTokens: prev.completionTokens + result.value.usage.completionTokens,
+        totalTokens: prev.totalTokens + result.value.usage.totalTokens,
+      });
+    }
+    return result;
   }
 
   /**

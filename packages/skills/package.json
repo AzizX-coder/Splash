@@ -5,8 +5,8 @@
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "clean": "rm -rf dist"
+    "build": "node --max-old-space-size=4096 ../../node_modules/typescript/bin/tsc -p tsconfig.json",
+    "clean": "node -e \"import('fs').then(fs=>fs.rmSync('dist',{recursive:true,force:true}))\""
   },
   "dependencies": {
     "@alpclaw/connectors": "workspace:*",
@@ -14,11 +14,14 @@
     "@alpclaw/utils": "workspace:*",
     "@mozilla/readability": "^0.6.0",
     "jsdom": "^29.1.1",
+    "pdf-parse": "^2.4.5",
     "turndown": "^7.2.4",
+    "xlsx": "^0.18.5",
     "zod": "^3.23.0"
   },
   "devDependencies": {
     "@types/jsdom": "^28.0.3",
+    "@types/pdf-parse": "^1.1.5",
     "@types/turndown": "^5.0.6"
   }
 }

@@ -5,3 +5,4 @@ export {
   validateFilePath,
   validateToolArgs,
 } from "./validator.js";
+export { classifyInput, type InputCategory } from "./filters.js";

@@ -8,6 +8,7 @@ import type {
 } from "@alpclaw/utils";
 import { ok, err, createError, createLogger } from "@alpclaw/utils";
 import type { ModelProvider, ProviderCapabilities } from "./provider.js";
+import { readGlobalConfig } from "@alpclaw/config";
 
 const log = createLogger("provider:openai");
 
@@ -22,11 +23,19 @@ export class OpenAIProvider implements ModelProvider {
   private defaultModel: string;
 
   constructor(
-    apiKey: string,
+    apiKey?: string,
     opts?: { name?: string; baseUrl?: string; defaultModel?: string },
   ) {
-    this.apiKey = apiKey;
     this.name = opts?.name || "openai";
+    const envKey = process.env[`${this.name.toUpperCase()}_API_KEY`];
+    const configKey = readGlobalConfig().apiKeys?.[this.name];
+    this.apiKey = apiKey || envKey || configKey || "";
+
+    if (!this.apiKey) {
+      const niceName = this.name.charAt(0).toUpperCase() + this.name.slice(1);
+      throw new Error(`[ERR] Not configured: Missing ${niceName} API key`);
+    }
+
     this.baseUrl = opts?.baseUrl || "https://api.openai.com/v1";
     this.defaultModel = opts?.defaultModel || "gpt-4o";
   }

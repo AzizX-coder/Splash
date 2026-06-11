@@ -59,6 +59,8 @@
     "prepublishOnly": "pnpm run typecheck && pnpm run lint && pnpm run test"
   },
   "devDependencies": {
+    "@esbuild/linux-x64": "0.21.5",
+    "@rollup/rollup-linux-x64-gnu": "^4.61.1",
     "@types/marked-terminal": "^6.1.1",
     "@types/node": "^22.0.0",
     "@types/react": "^18.3.12",

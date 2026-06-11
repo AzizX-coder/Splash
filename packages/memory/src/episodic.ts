@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
+import os from "node:os";
 import { globalConfigDir } from "@alpclaw/config";
 
 export interface MessageEntry {
@@ -13,8 +14,8 @@ export interface MessageEntry {
 export class EpisodicMemory {
   private baseDir: string;
 
-  constructor() {
-    this.baseDir = path.join(globalConfigDir(), "memory", "sessions");
+  constructor(baseDir?: string) {
+    this.baseDir = baseDir || path.join(os.homedir(), ".splash", "memory", "sessions");
     if (!fs.existsSync(this.baseDir)) {
       fs.mkdirSync(this.baseDir, { recursive: true });
     }

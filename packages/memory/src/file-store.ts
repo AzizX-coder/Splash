@@ -1,6 +1,7 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import os from "node:os";
 import {
   type MemoryEntry,
   type MemoryCategory,
@@ -23,8 +24,9 @@ export class FileMemoryStore implements MemoryStore {
   private entries: Map<string, MemoryEntry> = new Map();
   private loaded = false;
 
-  constructor(storagePath: string) {
-    this.filePath = join(storagePath, "memory.json");
+  constructor(storagePath?: string) {
+    const baseDir = storagePath ?? join(os.homedir(), ".splash", "memory");
+    this.filePath = join(baseDir, "memory.json");
   }
 
   async save(entry: MemoryEntry): Promise<Result<void>> {
