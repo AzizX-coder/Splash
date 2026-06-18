@@ -1,4 +1,4 @@
-import { type Result, ok, err, createError } from "@alpclaw/utils";
+import { type Result, ok, err, createError } from "@splash/utils";
 
 /**
  * Input validators for tool calls and commands.

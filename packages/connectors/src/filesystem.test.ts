@@ -3,7 +3,7 @@ import { rm, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { FilesystemConnector } from "./filesystem.js";
 
-const TEST_DIR = ".alpclaw/test-fs";
+const TEST_DIR = ".splash/test-fs";
 
 describe("FilesystemConnector", () => {
   const fs = new FilesystemConnector();

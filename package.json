@@ -34,8 +34,7 @@
     "node": ">=20.0.0"
   },
   "bin": {
-    "splash": "./bin/splash.mjs",
-    "alpclaw": "./bin/alpclaw.mjs"
+    "splash": "./bin/splash.mjs"
   },
   "files": [
     "bin/",

@@ -1,5 +1,5 @@
-import type { ToolDefinition } from "@alpclaw/utils";
-import { createLogger } from "@alpclaw/utils";
+import type { ToolDefinition } from "@splash/utils";
+import { createLogger } from "@splash/utils";
 import type { Connector } from "./connector.js";
 
 const log = createLogger("connectors:registry");

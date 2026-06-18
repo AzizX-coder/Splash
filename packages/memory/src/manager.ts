@@ -5,7 +5,7 @@ import {
   ok,
   generateId,
   createLogger,
-} from "@alpclaw/utils";
+} from "@splash/utils";
 import type { MemoryStore } from "./store.js";
 import { EpisodicMemory } from "./episodic.js";
 import { SemanticMemory } from "./semantic.js";

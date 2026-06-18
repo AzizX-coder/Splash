@@ -1,5 +1,5 @@
 {
-  "name": "@alpclaw/core",
+  "name": "@splash/core",
   "version": "0.1.2",
   "private": true,
   "type": "module",
@@ -9,14 +9,15 @@
     "clean": "node -e \"import('fs').then(fs=>fs.rmSync('dist',{recursive:true,force:true}))\""
   },
   "dependencies": {
-    "@alpclaw/utils": "workspace:*",
-    "@alpclaw/config": "workspace:*",
-    "@alpclaw/safety": "workspace:*",
-    "@alpclaw/memory": "workspace:*",
-    "@alpclaw/providers": "workspace:*",
-    "@alpclaw/connectors": "workspace:*",
-    "@alpclaw/skills": "workspace:*",
-    "@alpclaw/tools": "workspace:*",
+    "@splash/utils": "workspace:*",
+    "@splash/config": "workspace:*",
+    "@splash/safety": "workspace:*",
+    "@splash/memory": "workspace:*",
+    "@splash/providers": "workspace:*",
+    "@splash/connectors": "workspace:*",
+    "@splash/skills": "workspace:*",
+    "@splash/tools": "workspace:*",
+    "@splash/plugins": "workspace:*",
     "ink": "^5.0.1",
     "react": "^18.3.1",
     "zod": "^3.23.0"

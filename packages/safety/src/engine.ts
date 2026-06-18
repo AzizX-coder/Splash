@@ -3,7 +3,7 @@ import {
   type SafetyMode,
   type RiskLevel,
   createLogger,
-} from "@alpclaw/utils";
+} from "@splash/utils";
 import { BUILT_IN_POLICIES, type SafetyPolicy } from "./policies.js";
 
 const log = createLogger("safety");
@@ -141,5 +141,91 @@ export class SafetyEngine {
 
   getMode(): SafetyMode {
     return this.mode;
+  }
+
+  // ─── Phase 1.5 Additions: Injection, Credentials, Sandbox ──────────────────
+
+  /**
+   * Scan input for prompt injection attempts using pattern matching.
+   */
+  scanPromptInjection(input: string): { detected: boolean; reason?: string } {
+    const injectionPatterns = [
+      /ignore all previous instructions/i,
+      /you are now acting as/i,
+      /system prompt:/i,
+      /do not follow the rules/i,
+      /forget everything/i,
+    ];
+
+    for (const pattern of injectionPatterns) {
+      if (pattern.test(input)) {
+        return { detected: true, reason: `Matches prompt injection pattern: ${pattern.source}` };
+      }
+    }
+    return { detected: false };
+  }
+
+  /**
+   * Scan text (tool args, LLM outputs) for credentials (API keys, secrets).
+   */
+  scanCredentials(text: string): { detected: boolean; matches: string[] } {
+    const credentialPatterns = [
+      /(?:api_key|apikey|secret|token|password)[\s:=]+["'][a-zA-Z0-9_\-]{16,}["']/i,
+      /sk-[a-zA-Z0-9]{32,}/, // OpenAI/Anthropic
+      /xox[baprs]-[a-zA-Z0-9]{10,}/, // Slack
+      /AIza[0-9A-Za-z-_]{35}/, // Google
+    ];
+
+    const matches: string[] = [];
+    for (const pattern of credentialPatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        matches.push(match[0]);
+      }
+    }
+
+    return { detected: matches.length > 0, matches };
+  }
+
+  /**
+   * Redact any detected credentials in text before it reaches logs, cache, or memory.
+   * Replaces each match with a [REDACTED:<kind>] marker rather than dropping it,
+   * so the surrounding context remains intelligible.
+   */
+  redactCredentials(text: string): string {
+    if (!text) return text;
+    const patterns: Array<{ re: RegExp; label: string }> = [
+      { re: /(?:api_key|apikey|secret|token|password)[\s:=]+["'][a-zA-Z0-9_\-]{16,}["']/gi, label: "credential" },
+      { re: /sk-[a-zA-Z0-9]{32,}/g, label: "openai-key" },
+      { re: /xox[baprs]-[a-zA-Z0-9]{10,}/g, label: "slack-token" },
+      { re: /AIza[0-9A-Za-z-_]{35}/g, label: "google-key" },
+    ];
+    let out = text;
+    for (const { re, label } of patterns) {
+      out = out.replace(re, `[REDACTED:${label}]`);
+    }
+    return out;
+  }
+
+  /**
+   * Enforce filesystem sandbox (chroot) per skill.
+   */
+  resolveSandboxedPath(skillName: string, requestedPath: string, allowedDirs: string[]): string {
+    const path = require("node:path");
+    const os = require("node:os");
+
+    const resolved = path.resolve(requestedPath);
+    
+    // Check if resolved path is within any of the allowed directories
+    const isAllowed = allowedDirs.some((dir) => {
+      const allowedResolved = path.resolve(dir);
+      return resolved.startsWith(allowedResolved);
+    });
+
+    if (!isAllowed) {
+      throw new Error(`[Security] Skill "${skillName}" attempted to access path outside allowed sandbox: ${resolved}`);
+    }
+
+    return resolved;
   }
 }

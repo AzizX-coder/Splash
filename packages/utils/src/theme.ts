@@ -108,11 +108,13 @@ export function renderBanner(opts?: { subtitle?: string; compact?: boolean; styl
   }
 
   const logo = [
-    " ██████  ██████  ██       █████  ███████ ██   ██",
-    "██      ██    ██ ██      ██   ██ ██      ██   ██",
-    "███████ ███████  ██      ███████ ███████ ███████",
-    "     ██ ██       ██      ██   ██      ██ ██   ██",
-    "██████  ██       ███████ ██   ██ ███████ ██   ██"
+    "███████╗██████╗ ██╗      █████╗ ███████╗██╗  ██╗",
+    "██╔════╝██╔══██╗██║     ██╔══██╗██╔════╝██║  ██║",
+    "███████╗██████╔╝██║     ███████║███████╗███████║",
+    "╚════██║██╔═══╝ ██║     ██╔══██║╚════██║██╔══██║",
+    "███████║██║     ███████╗██║  ██║███████║██║  ██║",
+    "╚══════╝╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝",
+    "≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈",
   ];
 
   const terminalWidth = process.stdout.columns || 80;
@@ -127,7 +129,7 @@ export function renderBanner(opts?: { subtitle?: string; compact?: boolean; styl
 
   const lines = [
     "",
-    ...logo.map((l) => pad + color1(l)),
+    ...logo.map((l, i) => pad + (i === logo.length - 1 ? color2(l) : color1(l))),
     "",
     titlePad + titleStrip,
     "",
@@ -177,7 +179,7 @@ function skipAnim(): boolean {
     process.env.CI === "true" ||
     !!process.env.NO_COLOR ||
     process.env.SPLASH_NO_ANIM === "1" ||
-    process.env.ALPCLAW_NO_ANIM === "1"
+    process.env.SPLASH_NO_ANIM === "1"
   );
 }
 

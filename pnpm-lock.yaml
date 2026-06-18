@@ -91,33 +91,36 @@ importers:
 
   examples:
     dependencies:
-      '@alpclaw/config':
-        specifier: workspace:*
-        version: link:../packages/config
-      '@alpclaw/connectors':
-        specifier: workspace:*
-        version: link:../packages/connectors
-      '@alpclaw/core':
-        specifier: workspace:*
-        version: link:../packages/core
-      '@alpclaw/memory':
-        specifier: workspace:*
-        version: link:../packages/memory
-      '@alpclaw/providers':
-        specifier: workspace:*
-        version: link:../packages/providers
-      '@alpclaw/safety':
-        specifier: workspace:*
-        version: link:../packages/safety
-      '@alpclaw/skills':
-        specifier: workspace:*
-        version: link:../packages/skills
-      '@alpclaw/utils':
-        specifier: workspace:*
-        version: link:../packages/utils
       '@clack/prompts':
         specifier: ^1.2.0
         version: 1.2.0
+      '@splash/config':
+        specifier: workspace:*
+        version: link:../packages/config
+      '@splash/connectors':
+        specifier: workspace:*
+        version: link:../packages/connectors
+      '@splash/core':
+        specifier: workspace:*
+        version: link:../packages/core
+      '@splash/gateway':
+        specifier: workspace:*
+        version: link:../packages/gateway
+      '@splash/memory':
+        specifier: workspace:*
+        version: link:../packages/memory
+      '@splash/providers':
+        specifier: workspace:*
+        version: link:../packages/providers
+      '@splash/safety':
+        specifier: workspace:*
+        version: link:../packages/safety
+      '@splash/skills':
+        specifier: workspace:*
+        version: link:../packages/skills
+      '@splash/utils':
+        specifier: workspace:*
+        version: link:../packages/utils
       ink:
         specifier: ^5.0.1
         version: 5.2.1(@types/react@18.3.28)(react@18.3.1)
@@ -136,7 +139,7 @@ importers:
 
   packages/config:
     dependencies:
-      '@alpclaw/utils':
+      '@splash/utils':
         specifier: workspace:*
         version: link:../utils
       dotenv:
@@ -148,10 +151,10 @@ importers:
 
   packages/connectors:
     dependencies:
-      '@alpclaw/safety':
+      '@splash/safety':
         specifier: workspace:*
         version: link:../safety
-      '@alpclaw/utils':
+      '@splash/utils':
         specifier: workspace:*
         version: link:../utils
       zod:
@@ -160,28 +163,31 @@ importers:
 
   packages/core:
     dependencies:
-      '@alpclaw/config':
+      '@splash/config':
         specifier: workspace:*
         version: link:../config
-      '@alpclaw/connectors':
+      '@splash/connectors':
         specifier: workspace:*
         version: link:../connectors
-      '@alpclaw/memory':
+      '@splash/memory':
         specifier: workspace:*
         version: link:../memory
-      '@alpclaw/providers':
+      '@splash/plugins':
+        specifier: workspace:*
+        version: link:../plugins
+      '@splash/providers':
         specifier: workspace:*
         version: link:../providers
-      '@alpclaw/safety':
+      '@splash/safety':
         specifier: workspace:*
         version: link:../safety
-      '@alpclaw/skills':
+      '@splash/skills':
         specifier: workspace:*
         version: link:../skills
-      '@alpclaw/tools':
+      '@splash/tools':
         specifier: workspace:*
         version: link:../tools
-      '@alpclaw/utils':
+      '@splash/utils':
         specifier: workspace:*
         version: link:../utils
       ink:
@@ -194,24 +200,54 @@ importers:
         specifier: ^3.23.0
         version: 3.25.76
 
-  packages/memory:
+  packages/gateway:
     dependencies:
-      '@alpclaw/config':
+      '@splash/config':
         specifier: workspace:*
         version: link:../config
-      '@alpclaw/utils':
+      '@splash/core':
+        specifier: workspace:*
+        version: link:../core
+      '@splash/utils':
+        specifier: workspace:*
+        version: link:../utils
+
+  packages/mcp:
+    dependencies:
+      '@splash/utils':
+        specifier: workspace:*
+        version: link:../utils
+
+  packages/memory:
+    dependencies:
+      '@splash/config':
+        specifier: workspace:*
+        version: link:../config
+      '@splash/utils':
         specifier: workspace:*
         version: link:../utils
       zod:
         specifier: ^3.23.0
         version: 3.25.76
 
-  packages/providers:
+  packages/plugins:
     dependencies:
-      '@alpclaw/config':
+      '@splash/config':
         specifier: workspace:*
         version: link:../config
-      '@alpclaw/utils':
+      '@splash/mcp':
+        specifier: workspace:*
+        version: link:../mcp
+      '@splash/utils':
+        specifier: workspace:*
+        version: link:../utils
+
+  packages/providers:
+    dependencies:
+      '@splash/config':
+        specifier: workspace:*
+        version: link:../config
+      '@splash/utils':
         specifier: workspace:*
         version: link:../utils
       zod:
@@ -220,7 +256,7 @@ importers:
 
   packages/safety:
     dependencies:
-      '@alpclaw/utils':
+      '@splash/utils':
         specifier: workspace:*
         version: link:../utils
       zod:
@@ -229,18 +265,18 @@ importers:
 
   packages/skills:
     dependencies:
-      '@alpclaw/connectors':
-        specifier: workspace:*
-        version: link:../connectors
-      '@alpclaw/providers':
-        specifier: workspace:*
-        version: link:../providers
-      '@alpclaw/utils':
-        specifier: workspace:*
-        version: link:../utils
       '@mozilla/readability':
         specifier: ^0.6.0
         version: 0.6.0
+      '@splash/connectors':
+        specifier: workspace:*
+        version: link:../connectors
+      '@splash/providers':
+        specifier: workspace:*
+        version: link:../providers
+      '@splash/utils':
+        specifier: workspace:*
+        version: link:../utils
       jsdom:
         specifier: ^29.1.1
         version: 29.1.1
@@ -269,10 +305,10 @@ importers:
 
   packages/tools:
     dependencies:
-      '@alpclaw/skills':
+      '@splash/skills':
         specifier: workspace:*
         version: link:../skills
-      '@alpclaw/utils':
+      '@splash/utils':
         specifier: workspace:*
         version: link:../utils
     devDependencies:

@@ -6,7 +6,7 @@ import {
   createError,
   type CompletionRequest,
   type CompletionResponse,
-} from "@alpclaw/utils";
+} from "@splash/utils";
 import {
   type ModelProvider,
   type ProviderCapabilities,

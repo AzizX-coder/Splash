@@ -1,4 +1,4 @@
-import type { MemoryEntry, MemoryCategory, Result } from "@alpclaw/utils";
+import type { MemoryEntry, MemoryCategory, Result } from "@splash/utils";
 
 /**
  * Interface for memory storage backends.

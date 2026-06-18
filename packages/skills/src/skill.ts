@@ -1,4 +1,4 @@
-import type { SkillManifest, SkillResult, Result } from "@alpclaw/utils";
+import type { SkillManifest, SkillResult, Result } from "@splash/utils";
 
 /**
  * A Skill is a reusable, composable unit of agent behavior.

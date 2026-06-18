@@ -36,3 +36,7 @@ export { ImageGenSkill } from "./built-in/image-gen.js";
 export { TtsSkill } from "./built-in/tts.js";
 export { PdfReaderSkill } from "./built-in/pdf-reader.js";
 export { SpreadsheetEditorSkill } from "./built-in/spreadsheet-editor.js";
+export { JsonSchemaValidatorSkill } from "./built-in/json-schema-validator.js";
+export { EmailDrafterSkill, render as renderEmailTemplate } from "./built-in/email-drafter.js";
+export { TranslatorSkill } from "./built-in/translator.js";
+export { CodeFormatSkill, detectFormatter } from "./built-in/code-format.js";

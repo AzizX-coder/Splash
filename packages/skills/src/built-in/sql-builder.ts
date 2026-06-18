@@ -1,5 +1,5 @@
-import type { Result, SkillManifest, SkillResult } from "@alpclaw/utils";
-import { ok, err, createError } from "@alpclaw/utils";
+import type { Result, SkillManifest, SkillResult } from "@splash/utils";
+import { ok, err, createError } from "@splash/utils";
 import type { Skill, SkillContext } from "../skill.js";
 
 /**

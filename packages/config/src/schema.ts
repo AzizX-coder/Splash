@@ -16,6 +16,7 @@ export const ConfigSchema = z.object({
     storagePath: z.string().default(".splash/memory"),
     maxEntries: z.number().default(1000),
     ttlMs: z.number().default(7 * 24 * 60 * 60 * 1000), // 7 days
+    semanticCache: z.boolean().default(false), // spec §7.2 — opt-in similarity cache
   }),
   agent: z.object({
     maxRetries: z.number().min(0).max(10).default(3),
@@ -33,4 +34,4 @@ export const ConfigSchema = z.object({
   })).default({})
 });
 
-export type AlpClawConfig = z.infer<typeof ConfigSchema>;
+export type SplashConfig = z.infer<typeof ConfigSchema>;

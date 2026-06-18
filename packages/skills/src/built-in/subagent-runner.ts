@@ -1,7 +1,7 @@
-import type { SkillManifest, SkillResult, Result } from "@alpclaw/utils";
-import { ok, err, createError } from "@alpclaw/utils";
+import type { SkillManifest, SkillResult, Result } from "@splash/utils";
+import { ok, err, createError } from "@splash/utils";
 import type { Skill, SkillContext } from "../skill.js";
-// Dynamic import used later to avoid circular dependency with @alpclaw/core
+// Dynamic import used later to avoid circular dependency with @splash/core
 /**
  * SubagentRunnerSkill — spawns parallel autonomous sub-agents for complex tasks.
  *
@@ -15,7 +15,7 @@ export class SubagentRunnerSkill implements Skill {
   readonly manifest: SkillManifest = {
     name: "subagent-runner",
     description:
-      "Delegates independent tasks to fully autonomous AlpClaw sub-agents running in parallel. " +
+      "Delegates independent tasks to fully autonomous Splash sub-agents running in parallel. " +
       "Ideal for drastically speeding up complex multi-step routines like analyzing multiple files, " +
       "writing tests across separated folders, or scraping many pages simultaneously.",
     version: "1.0.0",
@@ -73,9 +73,9 @@ export class SubagentRunnerSkill implements Skill {
 
   private async invokeSubagent(objective: string): Promise<{ success: boolean; text: string }> {
     try {
-      const core = await import("@alpclaw/core");
-      const alpclaw = await core.AlpClaw.create();
-      const agent = alpclaw.createAgent({
+      const core = await import("@splash/core");
+      const splash = await core.Splash.create();
+      const agent = splash.createAgent({
         // Subagents run silently — no spinners or phase logs
         onPhaseChange: () => {},
         onToolCall: () => {},

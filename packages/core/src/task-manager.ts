@@ -1,5 +1,5 @@
-import type { Task, TaskStep, TaskContext, TaskResult, TaskStatus } from "@alpclaw/utils";
-import { generateId, createLogger } from "@alpclaw/utils";
+import type { Task, TaskStep, TaskContext, TaskResult, TaskStatus } from "@splash/utils";
+import { generateId, createLogger } from "@splash/utils";
 
 const log = createLogger("core:task");
 
@@ -48,13 +48,13 @@ export class TaskManager {
     }
   }
 
-  /** Add a step to a task. */
-  addStep(taskId: string, description: string, toolName?: string): TaskStep {
+  /** Add a step to a task. Optionally provide a custom step ID (e.g., from contract). */
+  addStep(taskId: string, description: string, toolName?: string, stepId?: string): TaskStep {
     const task = this.tasks.get(taskId);
     if (!task) throw new Error(`Task not found: ${taskId}`);
 
     const step: TaskStep = {
-      id: generateId("step"),
+      id: stepId || generateId("step"),
       description,
       status: "pending",
       toolName,
@@ -63,6 +63,19 @@ export class TaskManager {
     task.steps.push(step);
     task.updatedAt = Date.now();
     return step;
+  }
+
+  /** Add multiple steps with known IDs (for contract sync). */
+  addSteps(taskId: string, steps: Array<{ id: string; description: string; toolName?: string }>): TaskStep[] {
+    const task = this.tasks.get(taskId);
+    if (!task) throw new Error(`Task not found: ${taskId}`);
+
+    for (const s of steps) {
+      const step: TaskStep = { id: s.id, description: s.description, status: "pending", toolName: s.toolName };
+      task.steps.push(step);
+    }
+    task.updatedAt = Date.now();
+    return task.steps.slice(-steps.length);
   }
 
   /** Update a step's status and output. */

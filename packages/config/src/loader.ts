@@ -1,17 +1,17 @@
 import { config as loadDotenv } from "dotenv";
-import { ConfigSchema, type AlpClawConfig } from "./schema.js";
+import { ConfigSchema, type SplashConfig } from "./schema.js";
 import { readGlobalConfig } from "./global-store.js";
-import { createError, type Result, ok, err } from "@alpclaw/utils";
+import { createError, type Result, ok, err } from "@splash/utils";
 
 type DeepPartial<T> = {
   [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K];
 };
-export type AlpClawConfigOverrides = DeepPartial<AlpClawConfig>;
+export type SplashConfigOverrides = DeepPartial<SplashConfig>;
 
 /**
  * Layered config, lowest → highest precedence:
  *   1. defaults (schema)
- *   2. ~/.alpclaw/config.json
+ *   2. ~/.splash/config.json
  *   3. .env / process env
  *   4. explicit overrides passed to loadConfig()
  */
@@ -19,7 +19,7 @@ import * as fs from "node:fs";
 import { globalConfigPath } from "./global-store.js";
 import { ZodError } from "zod";
 
-export function loadConfig(overrides?: AlpClawConfigOverrides): Result<AlpClawConfig> {
+export function loadConfig(overrides?: SplashConfigOverrides): Result<SplashConfig> {
   loadDotenv();
 
   if (!fs.existsSync(globalConfigPath())) {
@@ -41,7 +41,7 @@ export function loadConfig(overrides?: AlpClawConfigOverrides): Result<AlpClawCo
     };
 
     const envGet = (key: string): string | undefined =>
-      process.env["SPLASH_" + key] || process.env["ALPCLAW_" + key];
+      process.env["SPLASH_" + key] || process.env["SPLASH_" + key];
 
     const envLayer = {
       providers: {

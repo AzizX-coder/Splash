@@ -15,7 +15,7 @@ export default defineConfig({
   bundle: true,
   noExternal: [
     // Bundle all internal workspace packages
-    /@alpclaw\/.*/,
+    /@splash\/.*/,
   ],
   external: [
     // Externalize all actual NPM node_modules

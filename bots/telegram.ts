@@ -1,5 +1,5 @@
 /**
- * AlpClaw Telegram connector node.
+ * Splash Telegram connector node.
  *
  * Configure:
  *   TELEGRAM_BOT_TOKEN    from @BotFather
@@ -12,8 +12,8 @@
 
 import { Telegraf, Markup } from "telegraf";
 import pc from "picocolors";
-import { runChatTask, getAlpClaw, chunkText } from "./lib/chat-agent.js";
-import { readGlobalConfig, writeGlobalConfig } from "@alpclaw/config";
+import { runChatTask, getSplash, chunkText } from "./lib/chat-agent.js";
+import { readGlobalConfig, writeGlobalConfig } from "@splash/config";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -36,7 +36,7 @@ async function main() {
   }
 
   // Initialize the agent framework
-  getAlpClaw();
+  getSplash();
   const bot = new Telegraf(token);
 
   // Auto-identify — fetch bot info from Telegram API
@@ -176,8 +176,8 @@ async function main() {
 
   bot.command("provider", async (ctx) => {
     try {
-      const alpclaw = await getAlpClaw();
-      const providers = alpclaw.router.listProviders();
+      const splash = await getSplash();
+      const providers = splash.router.listProviders();
       const current = readGlobalConfig().providers?.default || "openrouter";
       
       const buttons = providers.map(p => [

@@ -1,5 +1,5 @@
 /**
- * AlpClaw WhatsApp connector node — Twilio-compatible webhook.
+ * Splash WhatsApp connector node — Twilio-compatible webhook.
  *
  * Configure a Twilio WhatsApp Sender to POST messages to:
  *   https://<your-host>/whatsapp/incoming
@@ -13,7 +13,7 @@
 import * as crypto from "node:crypto";
 import * as http from "node:http";
 import pc from "picocolors";
-import { runChatTask, getAlpClaw, chunkText } from "./lib/chat-agent.js";
+import { runChatTask, getSplash, chunkText } from "./lib/chat-agent.js";
 
 function parseForm(body: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -73,7 +73,7 @@ function twiml(texts: string[]): string {
 }
 
 async function main() {
-  console.log(pc.bgCyan(pc.black(" SYSTEM BOOT ")) + " AlpClaw WhatsApp Connector");
+  console.log(pc.bgCyan(pc.black(" SYSTEM BOOT ")) + " Splash WhatsApp Connector");
 
   const authToken = process.env.TWILIO_AUTH_TOKEN;
   const port = Number(process.env.WHATSAPP_PORT || 3002);
@@ -84,7 +84,7 @@ async function main() {
     process.exit(1);
   }
 
-  getAlpClaw();
+  getSplash();
   console.log(pc.green("✓ Framework initialized."));
 
   const server = http.createServer(async (req, res) => {

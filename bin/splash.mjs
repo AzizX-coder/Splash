@@ -14,7 +14,6 @@ const __dirname = dirname(__filename);
 const packageRoot = resolve(__dirname, "..");
 
 process.env.SPLASH_HOME = packageRoot;
-process.env.ALPCLAW_HOME = packageRoot;
 process.env.FORCE_COLOR = "1";
 
 const distCliPath = resolve(packageRoot, "dist", "examples", "cli.js");

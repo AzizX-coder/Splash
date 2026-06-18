@@ -1,10 +1,10 @@
 /**
- * Core types used across all AlpClaw packages.
+ * Core types used across all Splash packages.
  */
 
 // ─── Result Type ─────────────────────────────────────────────────────────────
 
-export type Result<T, E = AlpClawError> =
+export type Result<T, E = SplashError> =
   | { ok: true; value: T }
   | { ok: false; error: E };
 
@@ -30,23 +30,26 @@ export type ErrorKind =
   | "timeout"
   | "internal";
 
-export interface AlpClawError {
+export interface SplashError {
   kind: ErrorKind;
   message: string;
   cause?: unknown;
   retryable: boolean;
+  /** HTTP status code when the error originates from a network/provider call. */
+  statusCode?: number;
 }
 
 export function createError(
   kind: ErrorKind,
   message: string,
-  opts?: { cause?: unknown; retryable?: boolean },
-): AlpClawError {
+  opts?: { cause?: unknown; retryable?: boolean; statusCode?: number },
+): SplashError {
   return {
     kind,
     message,
     cause: opts?.cause,
     retryable: opts?.retryable ?? false,
+    statusCode: opts?.statusCode,
   };
 }
 
@@ -83,7 +86,7 @@ export interface TaskStep {
   toolName?: string;
   toolInput?: Record<string, unknown>;
   output?: unknown;
-  error?: AlpClawError;
+  error?: SplashError;
   startedAt?: number;
   completedAt?: number;
 }
@@ -156,6 +159,8 @@ export interface CompletionResponse {
   usage: TokenUsage;
   model: string;
   finishReason: "stop" | "tool_calls" | "length" | "error";
+  /** Name of the provider that actually served this response (set by the router after fallback). */
+  providerUsed?: string;
 }
 
 export interface TokenUsage {
@@ -263,7 +268,7 @@ export interface ExecutionEntry {
   action: string;
   input?: unknown;
   output?: unknown;
-  error?: AlpClawError;
+  error?: SplashError;
   timestamp: number;
   durationMs: number;
 }

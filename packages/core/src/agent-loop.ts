@@ -7,16 +7,16 @@ import type {
   CompletionRequest,
   Result,
   ToolCall,
-  AlpClawError,
-} from "@alpclaw/utils";
-import { ok, err, createError, createLogger, generateId } from "@alpclaw/utils";
-import type { AlpClawConfig } from "@alpclaw/config";
-import { SafetyEngine } from "@alpclaw/safety";
-import { MemoryManager } from "@alpclaw/memory";
-import type { ProviderRouter } from "@alpclaw/providers";
-import { ConnectorRegistry } from "@alpclaw/connectors";
-import { SkillRegistry } from "@alpclaw/skills";
-import type { SkillContext } from "@alpclaw/skills";
+  SplashError,
+} from "@splash/utils";
+import { ok, err, createError, createLogger, generateId } from "@splash/utils";
+import type { SplashConfig } from "@splash/config";
+import { SafetyEngine } from "@splash/safety";
+import { MemoryManager } from "@splash/memory";
+import type { ProviderRouter } from "@splash/providers";
+import { ConnectorRegistry } from "@splash/connectors";
+import { SkillRegistry } from "@splash/skills";
+import type { SkillContext } from "@splash/skills";
 import { TaskManager } from "./task-manager.js";
 import { Verifier } from "./verifier.js";
 import { ContractBuilder, type Contract } from "./contract-builder.js";
@@ -24,10 +24,14 @@ import { ContractValidator } from "./contract-validator.js";
 import { StateMachine } from "./state-machine.js";
 import { ContextManager } from "./context-manager.js";
 import { ResultCache } from "./cache.js";
+import { SemanticCache } from "./semantic-cache.js";
 import { Reflector, type StepOutcome } from "./reflector.js";
 import { Executor, type ExecutionResult } from "./executor.js";
+import { ReplayLog } from "./runs/replay.js";
+import { ContractEvolution } from "./contract-evolution.js";
+import { shouldAttemptCorrection, collectFailedSteps, buildCorrectionContract, mergeCorrectionResults } from "./correction.js";
 import { SPLASH_MASTER_PROMPT } from "./prompts.js";
-import { classifyInput } from "@alpclaw/safety";
+import { classifyInput } from "@splash/safety";
 
 const log = createLogger("core:agent");
 
@@ -50,7 +54,7 @@ export interface AgentLoopCallbacks {
 }
 
 /**
- * AgentLoop is the core orchestrator of AlpClaw.
+ * AgentLoop is the core orchestrator of Splash.
  *
  * It implements the full agentic cycle:
  * intake → understand → plan → context_fetch → tool_select → execute → verify → correct → finalize → persist
@@ -66,6 +70,9 @@ export class AgentLoop {
   private stateMachine: StateMachine;
   private contextManager: ContextManager;
   private cache: ResultCache;
+  private semanticCache?: SemanticCache;
+  private replayLog = new ReplayLog();
+  private evolution = new ContractEvolution();
   private reflector: Reflector;
   private executor: Executor;
 
@@ -75,7 +82,7 @@ export class AgentLoop {
     private skills: SkillRegistry,
     private safety: SafetyEngine,
     private memory: MemoryManager,
-    appConfig: AlpClawConfig,
+    appConfig: SplashConfig,
     private callbacks: AgentLoopCallbacks = {},
   ) {
     this.taskManager = new TaskManager();
@@ -92,8 +99,11 @@ export class AgentLoop {
       appConfig.safety?.blockedPatterns || [],
     );
     this.stateMachine = new StateMachine();
-    this.contextManager = new ContextManager(100_000);
+    this.contextManager = ContextManager.hierarchical(100_000);
     this.cache = new ResultCache(undefined, appConfig.memory.ttlMs);
+    if (appConfig.memory.semanticCache) {
+      this.semanticCache = new SemanticCache({ ttlMs: appConfig.memory.ttlMs });
+    }
     this.reflector = new Reflector({ trash: this.memory.trash });
     this.executor = new Executor(
       router,
@@ -193,14 +203,58 @@ export class AgentLoop {
       }
       this.stateMachine.transition("cache_miss");
 
-      // ── Create task steps from contract ────────────────────────────────────
-      for (const contractStep of contract.steps) {
-        this.taskManager.addStep(task.id, contractStep.description, contractStep.tools[0]);
+      // Semantic cache (spec §7.2) — opt-in similarity lookup after exact miss.
+      if (this.semanticCache) {
+        const semHit = await this.semanticCache.get(taskDescription);
+        if (semHit) {
+          log.info("Semantic cache hit", { similarity: semHit.similarity.toFixed(3) });
+          this.callbacks.onCacheHit?.(cacheKey);
+          const taskResult = { success: true, output: semHit.result, summary: String(semHit.result), artifacts: [] };
+          this.taskManager.complete(task.id, taskResult);
+          this.callbacks.onTaskComplete?.(task);
+          return ok(task);
+        }
       }
+
+      // ── Create task steps from contract ────────────────────────────────────
+      this.taskManager.addSteps(task.id, contract.steps.map((cs) => ({
+        id: cs.id,
+        description: cs.description,
+        toolName: cs.tools[0],
+      })));
       // ── Execute ────────────────────────────────────────────────────────────
       this.taskManager.setStatus(task.id, "executing");
       const sysContent = this.callbacks.systemPersona || SPLASH_MASTER_PROMPT;
-      const execResult: ExecutionResult = await this.executor.execute(contract, sysContent);
+      let execResult: ExecutionResult = await this.executor.execute(contract, sysContent);
+
+      // ── Self-correction loop (ENGINE-INTERNALS §4.3) ─────────────────────────
+      // On verification failure, re-attempt only the failed steps, bounded by maxRetries.
+      let correctionAttempt = 0;
+      while (true) {
+        const interimResults = execResult.stepResults.map((s) => ({
+          description: `step ${s.stepId}`,
+          success: s.success,
+          output: s.output,
+        }));
+        const interim = this.verifier.verifyTaskCompletion(taskDescription, interimResults);
+        if (!shouldAttemptCorrection(interim.passed, correctionAttempt, this.config.maxRetries)) break;
+        const failed = collectFailedSteps(contract, execResult.stepResults);
+        if (failed.length === 0) break;
+        correctionAttempt++;
+        this.setPhase(task, "correct");
+        log.info("Self-correction attempt", { attempt: correctionAttempt, failed: failed.length });
+        const correction = buildCorrectionContract(contract, failed);
+        const corrExec = await this.executor.execute(correction, sysContent);
+        const merged = mergeCorrectionResults(execResult.stepResults, corrExec.stepResults);
+        const required = merged.filter((r) => !(r.error?.startsWith("Skipped:") ?? false));
+        execResult = {
+          ...execResult,
+          stepResults: merged,
+          success: required.length > 0 && required.every((r) => r.success),
+          someSucceeded: merged.some((r) => r.success),
+          totalTokens: this.contextManager.getTotalSpent(),
+        };
+      }
 
       // Sync executor results back into task for observability/compat
       for (const stepResult of execResult.stepResults) {
@@ -253,6 +307,9 @@ Provide a concise, conversational final reply to the user. If they just said a g
         }
       }
 
+      // Redact any credentials before the summary is cached or persisted to memory.
+      finalSummary = this.safety.redactCredentials(finalSummary);
+
       const taskResult = {
         success: verification.passed,
         output: stepResults,
@@ -269,6 +326,40 @@ Provide a concise, conversational final reply to the user. If they just said a g
       // ── Cache result ───────────────────────────────────────────────────────
       if (verification.passed) {
         this.cache.set(cacheKey, finalSummary);
+        if (this.semanticCache) {
+          await this.semanticCache.set(taskDescription, finalSummary, this.contextManager.getTotalSpent());
+        }
+      }
+
+      // ── Replay log (spec §7.5) ───────────────────────────────────────────────
+      try {
+        this.replayLog.record({
+          runId: task.id,
+          task: taskDescription,
+          objective: contract.objective,
+          contract,
+          steps: execResult.stepResults.map((s) => ({
+            id: s.stepId,
+            tool: s.tool,
+            success: s.success,
+            output: String(s.output ?? ""),
+            error: s.error,
+            durationMs: s.durationMs,
+          })),
+          totalTokens: execResult.totalTokens,
+          totalDurationMs: execResult.totalDurationMs,
+          success: verification.passed,
+        });
+      } catch (e) {
+        log.warn("Failed to write replay log", { error: String(e) });
+      }
+
+      // ── Contract evolution (spec §7.1) ───────────────────────────────────────
+      try {
+        const evo = this.evolution.record(contract.objective, verification.passed);
+        log.debug("Contract template graded", { status: evo.status, rate: (evo.successes / evo.runs).toFixed(2) });
+      } catch (e) {
+        log.warn("Failed to record contract evolution", { error: String(e) });
       }
 
       // ── Reflect ────────────────────────────────────────────────────────────

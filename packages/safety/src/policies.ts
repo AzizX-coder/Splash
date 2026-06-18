@@ -1,4 +1,4 @@
-import type { RiskLevel, SafetyMode } from "@alpclaw/utils";
+import type { RiskLevel, SafetyMode } from "@splash/utils";
 
 /**
  * Built-in safety policies that define what actions require confirmation

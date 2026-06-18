@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { runsDir, logsDir } from "@alpclaw/config";
+import { runsDir, logsDir } from "@splash/config";
 import type { RunStatus, RunEvent } from "./events.js";
 
 /**

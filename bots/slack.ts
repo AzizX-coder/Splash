@@ -1,5 +1,5 @@
 /**
- * AlpClaw Slack connector node.
+ * Splash Slack connector node.
  *
  * Uses Slack's Events API over a plain HTTP endpoint — no SDK dependency.
  * Configure your Slack app with:
@@ -15,7 +15,7 @@
 import * as crypto from "node:crypto";
 import * as http from "node:http";
 import pc from "picocolors";
-import { runChatTask, getAlpClaw, chunkText } from "./lib/chat-agent.js";
+import { runChatTask, getSplash, chunkText } from "./lib/chat-agent.js";
 
 const SLACK_API = "https://slack.com/api";
 const MAX_MSG = 3500;
@@ -65,7 +65,7 @@ function readBody(req: http.IncomingMessage): Promise<string> {
 }
 
 async function main() {
-  console.log(pc.bgCyan(pc.black(" SYSTEM BOOT ")) + " AlpClaw Slack Connector");
+  console.log(pc.bgCyan(pc.black(" SYSTEM BOOT ")) + " Splash Slack Connector");
 
   const token = process.env.SLACK_BOT_TOKEN;
   const secret = process.env.SLACK_SIGNING_SECRET;
@@ -76,7 +76,7 @@ async function main() {
     process.exit(1);
   }
 
-  getAlpClaw(); // warm up the agent platform
+  getSplash(); // warm up the agent platform
   console.log(pc.green("✓ Framework initialized."));
 
   const seen = new Set<string>();

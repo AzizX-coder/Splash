@@ -1,21 +1,21 @@
 /**
  * Shared chat-agent helper — used by every platform adapter.
- * Keeps one AlpClaw instance alive per process and exposes a simple
+ * Keeps one Splash instance alive per process and exposes a simple
  * "text in → text out" interface so platform bots stay tiny.
  */
 
-import { AlpClaw } from "@alpclaw/core";
+import { Splash } from "@splash/core";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 
-let _alpclaw: AlpClaw | null = null;
+let _splash: Splash | null = null;
 let _personaCache: string | undefined = undefined;
 
 function getPersona() {
   if (_personaCache !== undefined) return _personaCache;
   const localChar = path.resolve(process.cwd(), "character.md");
-  const globalChar = path.resolve(os.homedir(), ".alpclaw", "character.md");
+  const globalChar = path.resolve(os.homedir(), ".splash", "character.md");
   
   if (fs.existsSync(localChar)) {
     _personaCache = fs.readFileSync(localChar, "utf-8");
@@ -27,9 +27,9 @@ function getPersona() {
   return _personaCache;
 }
 
-export async function getAlpClaw(): Promise<AlpClaw> {
-  if (!_alpclaw) _alpclaw = await AlpClaw.create();
-  return _alpclaw;
+export async function getSplash(): Promise<Splash> {
+  if (!_splash) _splash = await Splash.create();
+  return _splash;
 }
 
 export interface ChatRunResult {
@@ -45,10 +45,10 @@ export async function runChatTask(text: string): Promise<ChatRunResult> {
 
   try {
     const persona = getPersona();
-    const alpclaw = await getAlpClaw();
+    const splash = await getSplash();
     
     // Conversational Fast-Path (Sub-second response for basic chat)
-    const router = alpclaw.router;
+    const router = splash.router;
     const fastCheck = await router.route({
        messages: [
          { role: "system", content: "You are a fast intent classifier. Does the user's message require using external tools, searching the web, reading/writing files, or doing any complex tasks? Reply strictly with 'YES' or 'NO'." },
@@ -71,7 +71,7 @@ export async function runChatTask(text: string): Promise<ChatRunResult> {
     }
 
     // Full Agent Loop (Complex tasks)
-    const agent = alpclaw.createAgent({
+    const agent = splash.createAgent({
       systemPersona: persona ? persona : undefined
     });
     const result = await agent.run(trimmed);

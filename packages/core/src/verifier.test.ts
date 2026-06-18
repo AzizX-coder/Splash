@@ -70,3 +70,55 @@ describe("Verifier", () => {
     });
   });
 });
+
+describe("Verifier — weighted multi-strategy (spec §2.4)", () => {
+  const verifier = new Verifier();
+
+  it("exact strategy passes on identical text and fails otherwise", () => {
+    expect(verifier.verifyWeighted([{ name: "x", strategy: { type: "exact", expected: "done" } }], "done").passed).toBe(true);
+    expect(verifier.verifyWeighted([{ name: "x", strategy: { type: "exact", expected: "done" } }], "nope").passed).toBe(false);
+  });
+
+  it("contains strategy matches substrings case-insensitively", () => {
+    const res = verifier.verifyWeighted([{ name: "c", strategy: { type: "contains", expected: "SUCCESS" } }], "operation success!");
+    expect(res.passed).toBe(true);
+  });
+
+  it("semantic strategy passes on high token overlap", () => {
+    const res = verifier.verifyWeighted(
+      [{ name: "s", strategy: { type: "semantic", expected: "the quick brown fox", threshold: 0.5 } }],
+      "the quick brown fox jumps",
+    );
+    expect(res.passed).toBe(true);
+  });
+
+  it("schema strategy validates object shape and required keys", () => {
+    const schema = { type: "object", required: ["id"], properties: { id: { type: "number" } } };
+    expect(verifier.verifyWeighted([{ name: "sc", strategy: { type: "schema", schema } }], { id: 5 }).passed).toBe(true);
+    expect(verifier.verifyWeighted([{ name: "sc", strategy: { type: "schema", schema } }], { name: "x" }).passed).toBe(false);
+    expect(verifier.verifyWeighted([{ name: "sc", strategy: { type: "schema", schema } }], '{"id":7}').passed).toBe(true);
+  });
+
+  it("function strategy runs a custom predicate", () => {
+    const res = verifier.verifyWeighted([{ name: "fn", strategy: { type: "function", fn: (o) => String(o).length > 3 } }], "hello");
+    expect(res.passed).toBe(true);
+  });
+
+  it("computes a weighted partial score when some criteria fail", () => {
+    const res = verifier.verifyWeighted(
+      [
+        { name: "a", strategy: { type: "contains", expected: "ok" }, weight: 3 },
+        { name: "b", strategy: { type: "contains", expected: "missing" }, weight: 1 },
+      ],
+      "all ok here",
+    );
+    expect(res.passed).toBe(false);
+    expect(res.score).toBeCloseTo(0.75, 5); // 3 of 4 weight passed
+  });
+
+  it("empty criteria => trivially passed with score 1", () => {
+    const res = verifier.verifyWeighted([], "anything");
+    expect(res.passed).toBe(true);
+    expect(res.score).toBe(1);
+  });
+});

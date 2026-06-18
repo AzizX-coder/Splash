@@ -1,9 +1,9 @@
 import { readFile, writeFile, readdir, stat, mkdir, unlink } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
-import type { ConnectorAction, Result, ToolDefinition } from "@alpclaw/utils";
-import { ok, err, createError, createLogger } from "@alpclaw/utils";
-import { validateFilePath } from "@alpclaw/safety";
+import type { ConnectorAction, Result, ToolDefinition } from "@splash/utils";
+import { ok, err, createError, createLogger } from "@splash/utils";
+import { validateFilePath } from "@splash/safety";
 import type { Connector } from "./connector.js";
 
 const log = createLogger("connector:filesystem");

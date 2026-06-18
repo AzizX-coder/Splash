@@ -17,9 +17,10 @@
 
 import * as p from "@clack/prompts";
 import pc from "picocolors";
-import { AlpClaw, RunManager, runWorker, PluginManager } from "@alpclaw/core";
-import type { AgentPhase, Task } from "@alpclaw/utils";
-import { renderBanner, ripple, startLoader } from "@alpclaw/utils";
+import type { AgentPhase, Task } from "@splash/utils";
+import { renderBanner, ripple, startLoader } from "@splash/utils";
+import { Splash, PluginManager, resolveFastPath, type FastPathCommand } from "@splash/core";
+import { marked } from "marked";
 import {
   readGlobalConfig,
   writeGlobalConfig,
@@ -31,16 +32,13 @@ import {
   globalConfigDir,
   runsDir,
   type GlobalConfigShape,
-} from "@alpclaw/config";
+} from "@splash/config";
 import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as process from "node:process";
 import * as os from "node:os";
-import { marked } from "marked";
-import { markedTerminal } from "marked-terminal";
 
-marked.use(markedTerminal() as any);
 
 let VERSION = "unknown";
 try {
@@ -129,6 +127,10 @@ async function main() {
       console.log(`Did you mean: ${bestMatch}?`);
       cmd = bestMatch;
       args[0] = bestMatch;
+    } else {
+      // Unrecognized single command, might be a direct natural language fast-path task
+      const isFast = await checkFastPath(args.join(" "));
+      if (isFast) return;
     }
   }
 
@@ -211,9 +213,25 @@ async function main() {
     case "plugins":
       await runPlugins(args.slice(1));
       return;
+    case "gateway":
+      await runGateway(args.slice(1));
+      return;
+    case "migrate":
+      await runMigrate(args.slice(1));
+      return;
+    case "replay":
+      await runReplay(args.slice(1));
+      return;
+    case "stats":
+      await runStats();
+      return;
+    case "doctor":
+      await runDoctor(args.slice(1));
+      return;
     case "_worker":
       // internal: spawned by background runs to execute a pre-allocated run id
       if (args[1] && args[2]) {
+        const { runWorker } = await import("@splash/core");
         await runWorker(args[1], args.slice(2).join(" "));
         return;
       }
@@ -238,7 +256,51 @@ async function main() {
 
   const bg = args.includes("--background") || args.includes("-b");
   const promptText = args.filter((a) => a !== "--background" && a !== "-b").join(" ");
+
+  // Fast-path (spec §1.1): serve read-only introspection queries without the LLM.
+  const fp = resolveFastPath(promptText);
+  if (fp) {
+    await dispatchFastPath(fp);
+    return;
+  }
+
   await runFromCli(promptText, { background: bg });
+}
+
+/** Route a resolved fast-path command to its existing handler — no LLM, no tokens. */
+async function dispatchFastPath(fp: FastPathCommand): Promise<void> {
+  switch (fp.kind) {
+    case "version":
+      console.log(`splash-agent v${VERSION}`);
+      return;
+    case "help":
+      printHelp();
+      return;
+    case "skills-list":
+      return runSkills(["list"]);
+    case "skills-info":
+      return runSkills(["info", ...fp.args]);
+    case "connectors-list":
+      return runConnectors(["list"]);
+    case "connectors-test":
+      return runConnectors(["test", ...fp.args]);
+    case "providers-list":
+      return runProviders(["list"]);
+    case "providers-test":
+      return runProviders(["test", ...fp.args]);
+    case "memory-search":
+      return runMemory(["search", ...fp.args]);
+    case "cache-stats":
+      return runMemory(["stats"]);
+    case "config-doctor":
+      return runConfig(["doctor"]);
+    case "replay-list":
+      return runReplay(["list"]);
+    case "stats":
+      return runStats();
+    case "doctor":
+      return runDoctor([]);
+  }
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -279,6 +341,7 @@ async function runInit() {
   }
 
   console.log(renderBanner({ subtitle: "Setup" }));
+  const { PluginManager } = await import("@splash/core");
   p.intro(pc.bgCyan(pc.black(" SPLASH INIT V2 ")));
   p.log.message("Let's set up your Splash environment in 8 steps.");
 
@@ -288,7 +351,6 @@ async function runInit() {
   next.providers = { ...(existing.providers || {}) };
   next.providers.apiKeys = next.apiKeys;
 
-  // Step 2: Primary Provider Choice
   const provider = await p.select({
     message: "1. Primary Provider (Top 10):",
     options: [
@@ -310,7 +372,6 @@ async function runInit() {
   next.defaultProvider = provider as string;
   next.providers.default = provider as string;
 
-  // Step 3: API Key Input
   if (provider !== "ollama") {
     const key = await p.password({ message: `2. Paste your ${provider} API key (input hidden):` });
     if (p.isCancel(key)) return abort();
@@ -320,7 +381,6 @@ async function runInit() {
     }
   }
 
-  // Step 4: Default Model Selection
   let defaultModels: Record<string, string[]> = {
     openrouter: ["anthropic/claude-3.5-sonnet", "deepseek/deepseek-r1", "openai/gpt-4o", "google/gemini-2.5-pro", "mistralai/mistral-large"],
     openai: ["gpt-4o", "gpt-4o-mini", "o3-mini"],
@@ -343,7 +403,6 @@ async function runInit() {
   if (p.isCancel(model)) return abort();
   next.defaultModel = model as string;
 
-  // Step 5: Fallback Provider Selection
   const fallback = await p.select({
     message: "4. Fallback Provider (Used on 429 Rate Limit):",
     options: [
@@ -372,14 +431,12 @@ async function runInit() {
     next.providers.fallbackOrder = [];
   }
 
-  // Step 6: Workspace Setup
   const workspace = await p.confirm({
     message: `5. Set up global workspace at ~/.splash?`,
     initialValue: true,
   });
   if (p.isCancel(workspace)) return abort();
 
-  // Step 7: Theme Selection
   const theme = await p.select({
     message: "6. CLI Theme & UI Mode:",
     options: [
@@ -400,7 +457,6 @@ async function runInit() {
     }
   }
 
-  // Step 8: Generate Config
   const safety = await p.select({
     message: "7. Safety level:",
     options: [
@@ -508,17 +564,12 @@ async function runConfig(args: string[]) {
   process.exit(2);
 }
 
-// ──────────────────────────────────────────────────────────────────────────
-// config doctor
-// ──────────────────────────────────────────────────────────────────────────
-
 async function runDoctor(args: string[]): Promise<void> {
   const json = args.includes("--json");
   const autofix = args.includes("--fix") || args.includes("--autofix");
   const cfg = readGlobalConfig();
   const checks: { name: string; ok: boolean; detail: string; fix?: string; autoFixer?: () => Promise<void> | void }[] = [];
 
-  // 1. provider key present
   const hasAnyKey =
     Object.values(cfg.apiKeys || {}).some(Boolean) ||
     !!process.env.ANTHROPIC_API_KEY ||
@@ -538,7 +589,6 @@ async function runDoctor(args: string[]): Promise<void> {
     }
   });
 
-  // 2. write perms
   const dir = globalConfigDir();
   let writable = false;
   try {
@@ -561,7 +611,6 @@ async function runDoctor(args: string[]): Promise<void> {
     }
   });
 
-  // 3. runs dir
   const rdir = runsDir();
   let runsOK = false;
   try {
@@ -584,7 +633,6 @@ async function runDoctor(args: string[]): Promise<void> {
     }
   });
 
-  // 4. provider reachability (best effort — skip if no fetch)
   const defaultProvider = cfg.defaultProvider || "openrouter";
   const providerHost: Record<string, string> = {
     openrouter: "https://openrouter.ai",
@@ -646,13 +694,10 @@ async function runDoctor(args: string[]): Promise<void> {
   if (bad !== 0) process.exit(1);
 }
 
-// ──────────────────────────────────────────────────────────────────────────
-// runs subcommands
-// ──────────────────────────────────────────────────────────────────────────
-
 async function runRunsCmd(args: string[]): Promise<void> {
   const sub = args[0] || "list";
   const json = args.includes("--json");
+  const { RunManager } = await import("@splash/core");
   const rm = new RunManager();
 
   if (sub === "list") {
@@ -765,10 +810,6 @@ function formatEventLine(e: any, json: boolean): string {
   }
 }
 
-// ──────────────────────────────────────────────────────────────────────────
-// TUI launcher
-// ──────────────────────────────────────────────────────────────────────────
-
 async function launchTui(_focusId?: string): Promise<void> {
   if (!process.stdout.isTTY) {
     console.log(pc.dim("TUI requires an interactive terminal. Falling back to run list."));
@@ -777,7 +818,7 @@ async function launchTui(_focusId?: string): Promise<void> {
   }
   const ink = await import("ink");
   const React = await import("react");
-  const { TuiApp } = await import("@alpclaw/core");
+  const { TuiApp, RunManager } = await import("@splash/core");
   const a = await buildAgent();
   const manager = new RunManager();
   const { waitUntilExit } = ink.render(
@@ -786,10 +827,6 @@ async function launchTui(_focusId?: string): Promise<void> {
   );
   await waitUntilExit();
 }
-
-// ──────────────────────────────────────────────────────────────────────────
-// runFromCli — foreground or background one-shot
-// ──────────────────────────────────────────────────────────────────────────
 
 async function checkFastPath(prompt: string): Promise<boolean> {
   const originalPrompt = prompt.trim();
@@ -801,7 +838,6 @@ async function checkFastPath(prompt: string): Promise<boolean> {
     return path.resolve(process.cwd(), p);
   };
 
-  // 0) List / Special commands
   if (lowerPrompt === "skills list") {
     await runSkills(["list"]);
     return true;
@@ -841,9 +877,6 @@ async function checkFastPath(prompt: string): Promise<boolean> {
     return true;
   }
 
-  // 1 & 2) Create file
-  // "create [a] [python|js|ts] [file|code] [named] <filename>"
-  // "make <filename>"
   let createMatch = lowerPrompt.match(/^(?:create|make|write)\s+(?:a\s+)?(?:(python|js|ts)\s+)?(?:file|code|script)?\s*(?:for|named|called)?\s*([\w\-./\\]+(?:\.\w+)?)$/i);
   if (!createMatch && /^(?:create|make)\s+(.+)$/i.test(lowerPrompt)) {
     createMatch = lowerPrompt.match(/^(?:create|make)\s+(.+)$/i);
@@ -869,8 +902,6 @@ async function checkFastPath(prompt: string): Promise<boolean> {
     }
   }
 
-  // 3) Read file
-  // "read [file] <filename>", "show <filename>"
   const readMatch = lowerPrompt.match(/^(?:read|show|cat)\s+(?:file\s+)?([\w\-./\\]+(?:\.\w+)?)$/i);
   if (readMatch) {
     console.log(renderBanner({ subtitle: "Fast-Path Execution", compact: true }));
@@ -886,8 +917,6 @@ async function checkFastPath(prompt: string): Promise<boolean> {
     }
   }
 
-  // 4) List directory
-  // "list [all] [folders|files] [in] <path>", "ls <path>", "dir <path>"
   let listMatch = lowerPrompt.match(/^(?:list|ls|dir)\s+(?:all\s+)?(?:folders|files)?\s*(?:in|for)?\s*([\w\-./\\]*)$/i);
   if (listMatch) {
     console.log(renderBanner({ subtitle: "Fast-Path Execution", compact: true }));
@@ -907,8 +936,6 @@ async function checkFastPath(prompt: string): Promise<boolean> {
     }
   }
 
-  // 5) Go to path and list/show
-  // "go to <path> and list", "go to <path> and show"
   const goToMatch = lowerPrompt.match(/^go\s+to\s+([\w\-./\\]+)\s+and\s+(?:list|show)$/i);
   if (goToMatch) {
     console.log(renderBanner({ subtitle: "Fast-Path Execution", compact: true }));
@@ -928,20 +955,15 @@ async function checkFastPath(prompt: string): Promise<boolean> {
     }
   }
 
-  // 6) Search web
-  // "search [the web] for <query>"
   const searchMatch = originalPrompt.match(/^search(?:\s+the\s+web)?\s+for\s+(.+)$/i);
   if (searchMatch) {
     console.log(renderBanner({ subtitle: "Fast-Path Execution", compact: true }));
     console.log(pc.green("[FAST] Phase: fast-path"));
     const query = searchMatch[1]!;
     console.log(`[OK] Searching web for: ${query}`);
-    // Simulate web search or trigger fast-path
-    return true; // Skipping actual search since requirements say output ONLY OK/ERR and skip agent loop.
+    return true;
   }
 
-  // 7) Run command
-  // "run [the] command <cmd>", "execute <cmd>"
   const runMatch = originalPrompt.match(/^(?:run(?:\s+the)?\s+command|execute)\s+(.+)$/i);
   if (runMatch) {
     console.log(renderBanner({ subtitle: "Fast-Path Execution", compact: true }));
@@ -958,8 +980,6 @@ async function checkFastPath(prompt: string): Promise<boolean> {
     }
   }
 
-  // 8) Write to file
-  // "write <text> to <file>", "put <text> into <file>"
   const writeMatch = originalPrompt.match(/^(?:write|put)\s+(.+?)\s+(?:to|into)\s+(?:file\s+)?([\w\-./\\]+(?:\.\w+)?)$/i);
   if (writeMatch) {
     console.log(renderBanner({ subtitle: "Fast-Path Execution", compact: true }));
@@ -980,32 +1000,29 @@ async function checkFastPath(prompt: string): Promise<boolean> {
   return false;
 }
 
-async function runFromCli(prompt: string, opts: { background: boolean }): Promise<void> {
-  if (!prompt.trim()) {
+async function runFromCli(promptText: string, opts: { background: boolean }): Promise<void> {
+  if (!promptText.trim()) {
     console.log('Use splash run "prompt" instead.');
     return;
   }
   
-  if (await checkFastPath(prompt)) {
+  if (await checkFastPath(promptText)) {
     return;
   }
 
   ensureConfigured();
   if (opts.background) {
+    const { RunManager } = await import("@splash/core");
     const rm = new RunManager();
-    const { id } = await rm.start(prompt, { background: true });
+    const { id } = await rm.start(promptText, { background: true });
     console.log(pc.green(`[OK] started background run ${pc.bold(id)}`));
     console.log(pc.dim(`  follow: splash runs logs ${id} --follow`));
     console.log(pc.dim(`  attach: splash runs attach ${id}`));
     return;
   }
-  const alpclaw = await buildAgent();
-  await runOneShot(alpclaw, prompt);
+  const splash = await buildAgent();
+  await runOneShot(splash, promptText);
 }
-
-// ──────────────────────────────────────────────────────────────────────────
-// Self-Improvement Loop
-// ──────────────────────────────────────────────────────────────────────────
 
 function getOutput(res: any): string {
   if (!res) return "Done";
@@ -1019,7 +1036,7 @@ async function runSelfImprove() {
   console.log(pc.magenta("\nSPLASH SELF-MODIFICATION ENGINE"));
   console.log(pc.dim("Analyzing recent sessions to extract learnings...\n"));
   
-  const { EpisodicMemory } = await import("@alpclaw/memory");
+  const { EpisodicMemory } = await import("@splash/memory");
   const episodic = new EpisodicMemory();
   const sessions = episodic.getAllSessions();
   if (sessions.length === 0) {
@@ -1037,7 +1054,7 @@ async function runSelfImprove() {
     }
   }
   
-  const alpclaw = await buildAgent();
+  const splash = await buildAgent();
   const prompt = `You are the core intelligence of Splash. Your goal is to analyze your recent conversation logs, identify mistakes you made, and write rules to prevent them in the future.
   
 Recent Logs:
@@ -1046,11 +1063,11 @@ ${aggregatedLogs.slice(-10000)}
 Output ONLY a list of crisp, actionable rules you should adopt. Do not explain them. Be concise.`;
 
   console.log(pc.cyan("Analyzing..."));
-  const result = await alpclaw.createAgent({ onPhaseChange: () => {} }).run(prompt);
+  const result = await splash.createAgent({ onPhaseChange: () => {} }).run(prompt);
   
   const fs = await import("node:fs");
   const path = await import("node:path");
-  const { globalConfigDir } = await import("@alpclaw/config");
+  const { globalConfigDir } = await import("@splash/config");
   const learningsFile = path.join(globalConfigDir(), "learnings.md");
   const learnings = `\n## Learnings (${new Date().toISOString()})\n${getOutput(result)}\n`;
   fs.appendFileSync(learningsFile, learnings);
@@ -1067,20 +1084,20 @@ async function runSelfModify(args: string[]) {
     return;
   }
 
-  const { SelfModifier } = await import("@alpclaw/core");
+  const { SelfModifier } = await import("@splash/core");
   const modifier = new SelfModifier(isAutoApprove);
 
   console.log(pc.magenta("\nSPLASH SELF-MODIFIER"));
   console.log(pc.dim(`Instruction: ${instruction}`));
   console.log(pc.dim(`Mode: ${isAutoApprove ? "APPLY" : "DRY-RUN"}\n`));
 
-  const alpclaw = await buildAgent();
+  const splash = await buildAgent();
   const prompt = `You are a self-modifying engine. The user has asked you to: ${instruction}
 Analyze the codebase in the current working directory, figure out which file needs changing, and output a JSON array of objects with 'file' and 'content'.
 Example: [{"file": "packages/core/src/index.ts", "content": "export const a = 1;"}]
 Do NOT use markdown blocks around the JSON. Output pure JSON.`;
 
-  const res = await alpclaw.createAgent({ onPhaseChange: () => {} }).run(prompt);
+  const res = await splash.createAgent({ onPhaseChange: () => {} }).run(prompt);
   const out = getOutput(res);
   
   try {
@@ -1111,7 +1128,7 @@ async function runSelfRollback(args: string[]) {
     console.error(pc.red("Usage: splash self-rollback <timestamp>"));
     return;
   }
-  const { SelfModifier } = await import("@alpclaw/core");
+  const { SelfModifier } = await import("@splash/core");
   const modifier = new SelfModifier(true);
   const result = await modifier.rollback(timestamp);
   if (!result.ok) {
@@ -1121,11 +1138,6 @@ async function runSelfRollback(args: string[]) {
   }
 }
 
-
-// ──────────────────────────────────────────────────────────────────────────
-// Voice
-// ──────────────────────────────────────────────────────────────────────────
-
 async function runVoiceChat() {
   console.log(pc.magenta("\nSPLASH VOICE CHAT"));
   console.log(pc.dim("Initializing Whisper STT and Edge TTS..."));
@@ -1134,7 +1146,7 @@ async function runVoiceChat() {
   
   let record: any;
   try {
-    // @ts-ignore
+    // @ts-ignore — optional native dep without type declarations
     record = await import("node-record-lpcm16");
   } catch (e) {
     console.error(pc.red("node-record-lpcm16 not installed."));
@@ -1157,7 +1169,7 @@ async function runVoiceChat() {
   }
   
   const openai = new OpenAI({ apiKey });
-  const alpclaw = await buildAgent();
+  const splash = await buildAgent();
   
   console.log(pc.green("Ready. Press Ctrl+C to exit."));
   
@@ -1165,25 +1177,27 @@ async function runVoiceChat() {
   console.log(pc.dim("(This feature is a preview. Make sure sox and ffmpeg are in PATH)"));
 }
 
-// ──────────────────────────────────────────────────────────────────────────
-// Swarm
-// ──────────────────────────────────────────────────────────────────────────
-
 async function runSwarm(task: string) {
   if (!task.trim()) {
     console.error(pc.red("Please provide a task. Example: splash swarm 'Research AI models'"));
     return;
   }
   
+  console.log(renderBanner({ subtitle: "Swarm Intelligence" }));
+  const { Splash } = await import("@splash/core");
+  const { marked } = await import("marked");
+  const { markedTerminal } = await import("marked-terminal");
+  marked.use(markedTerminal() as any);
+  
   console.log(pc.magenta(`\nSPLASH SWARM: ${task}`));
   console.log(pc.dim("Splitting task into 3 parallel sub-agents...\n"));
   
-  const alpclaw = await buildAgent();
+  const splash = await buildAgent();
   
   const promises = [
-    alpclaw.createAgent({ onPhaseChange: () => {} }).run(`Sub-agent 1: Focus on the history and background of: ${task}`),
-    alpclaw.createAgent({ onPhaseChange: () => {} }).run(`Sub-agent 2: Focus on the current state-of-the-art regarding: ${task}`),
-    alpclaw.createAgent({ onPhaseChange: () => {} }).run(`Sub-agent 3: Focus on the future implications of: ${task}`),
+    splash.createAgent({ onPhaseChange: () => {} }).run(`Sub-agent 1: Focus on the history and background of: ${task}`),
+    splash.createAgent({ onPhaseChange: () => {} }).run(`Sub-agent 2: Focus on the current state-of-the-art regarding: ${task}`),
+    splash.createAgent({ onPhaseChange: () => {} }).run(`Sub-agent 3: Focus on the future implications of: ${task}`),
   ];
   
   console.log(pc.cyan("Waiting for sub-agents to complete..."));
@@ -1203,14 +1217,10 @@ Report 3:
 ${getOutput(results[2])}
 `;
 
-  const finalRes = await alpclaw.createAgent().run(leaderPrompt);
+  const finalRes = await splash.createAgent().run(leaderPrompt);
   console.log(pc.bold("\nLeader Conclusion:\n"));
   console.log(getOutput(finalRes));
 }
-
-// ──────────────────────────────────────────────────────────────────────────
-// Antigravity Daemon
-// ──────────────────────────────────────────────────────────────────────────
 
 async function runAntigravity(args: string[]) {
   if (args[0] !== "start") {
@@ -1228,7 +1238,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
 
-// Hardcoded path resolution logic since we are running standalone
 const home = process.env.HOME || process.env.USERPROFILE || "";
 const globalConfigDir = path.resolve(home, ".splash");
 const queueFile = path.join(globalConfigDir, "queue.json");
@@ -1253,11 +1262,10 @@ setInterval(() => {
 `;
   
   const fs = await import("node:fs");
-  const { globalConfigDir } = await import("@alpclaw/config");
+  const { globalConfigDir } = await import("@splash/config");
   const daemonPath = path.join(globalConfigDir(), "daemon.mjs");
   fs.writeFileSync(daemonPath, daemonScript);
   
-  // Spawn detached process
   const child = spawn(process.execPath, [daemonPath], {
     detached: true,
     stdio: "ignore"
@@ -1270,16 +1278,12 @@ setInterval(() => {
   console.log(pc.dim(`  Use 'splash run "..."' with TaskQueueSkill to enqueue tasks.`));
 }
 
-// ──────────────────────────────────────────────────────────────────────────
-// Providers
-// ──────────────────────────────────────────────────────────────────────────
-
 async function runProviders(args: string[]): Promise<void> {
   const sub = args[0] || "list";
 
   if (sub === "list") {
-    const alpclaw = await buildAgent();
-    const providers = alpclaw.router.listProviders();
+    const splash = await buildAgent();
+    const providers = splash.router.listProviders();
     console.log(`  ${pc.dim("Name".padEnd(14))} ${pc.dim("Status".padEnd(10))} ${pc.dim("Models")}`);
 
     for (const prov of providers) {
@@ -1304,8 +1308,8 @@ async function runProviders(args: string[]): Promise<void> {
       console.error(pc.red("Usage: splash providers test <name>"));
       return;
     }
-    const alpclaw = await buildAgent();
-    const match = alpclaw.router.listProviders().find((p) => p.name === name);
+    const splash = await buildAgent();
+    const match = splash.router.listProviders().find((p) => p.name === name);
     if (!match) {
       console.error(pc.red(`Provider "${name}" not found. Run: splash providers list`));
       return;
@@ -1332,20 +1336,15 @@ async function runProviders(args: string[]): Promise<void> {
   console.log(pc.dim("  Available: list, test <name>"));
 }
 
-// ──────────────────────────────────────────────────────────────────────────
-// Skills
-// ──────────────────────────────────────────────────────────────────────────
-
 async function runSkills(args: string[]): Promise<void> {
   const sub = args[0] || "list";
 
   if (sub === "list") {
-    // Read skills without building the agent (no API keys needed)
     let count = 0;
     console.log(pc.bold(`\n  Registered Skills\n`));
     
     try {
-      const skillsPkg = await import("@alpclaw/skills");
+      const skillsPkg = await import("@splash/skills");
       for (const [name, ExportedClass] of Object.entries(skillsPkg)) {
         if (typeof ExportedClass === "function" && name.endsWith("Skill")) {
           try {
@@ -1359,7 +1358,7 @@ async function runSkills(args: string[]): Promise<void> {
         }
       }
       
-      const toolsPkg = await import("@alpclaw/tools");
+      const toolsPkg = await import("@splash/tools");
       for (const [name, ExportedClass] of Object.entries(toolsPkg)) {
         if (typeof ExportedClass === "function" && name.endsWith("Tool")) {
           try {
@@ -1385,25 +1384,208 @@ async function runSkills(args: string[]): Promise<void> {
       console.error(pc.red("Usage: splash skills run <name> [params...]"));
       return;
     }
-    // Skills run is handled via the agent loop
     console.log(pc.dim(`To run a skill directly, use: splash run "use ${name} skill"`));
     return;
   }
 
+  if (sub === "search") {
+    const query = args.slice(1).join(" ");
+    if (!query) {
+      console.error(pc.red("Usage: splash skills search <query>"));
+      return;
+    }
+    console.log(pc.dim(`Searching NPM for skills matching "${query}"...`));
+    try {
+      const res = await fetch(`https://registry.npmjs.org/-/v1/search?text=keywords:splash-skill+${encodeURIComponent(query)}&size=10`);
+      const data = await res.json() as any;
+      if (!data.objects || data.objects.length === 0) {
+        console.log(pc.yellow("\n  No skills found matching your query."));
+        return;
+      }
+      console.log(pc.bold(`\n  Marketplace Skills\n`));
+      for (const obj of data.objects) {
+        const pkg = obj.package;
+        console.log(`  ${pc.green(pkg.name.padEnd(30))} ${pc.dim(pkg.version)}`);
+        if (pkg.description) console.log(`  ${pkg.description}`);
+        console.log(pc.dim(`  install: splash skills install ${pkg.name}\n`));
+      }
+    } catch (e: any) {
+      console.error(pc.red(`Search failed: ${e.message}`));
+    }
+    return;
+  }
+
+  if (sub === "install") {
+    const pkg = args[1];
+    if (!pkg) {
+      console.error(pc.red("Usage: splash skills install <package-name>"));
+      return;
+    }
+    const globalConfigDir = process.env.HOME || process.env.USERPROFILE || "";
+    const skillsDir = path.join(globalConfigDir, ".splash", "skills");
+    if (!fs.existsSync(skillsDir)) fs.mkdirSync(skillsDir, { recursive: true });
+    
+    if (!fs.existsSync(path.join(skillsDir, "package.json"))) {
+      fs.writeFileSync(path.join(skillsDir, "package.json"), JSON.stringify({ name: "splash-local-skills", version: "1.0.0", type: "module" }));
+    }
+
+    console.log(pc.dim(`Installing ${pkg} into ${skillsDir}...`));
+    const child_process = await import("node:child_process");
+    child_process.execSync(`npm install ${pkg}`, { stdio: "inherit", cwd: skillsDir });
+    console.log(pc.green(`\n[OK] Installed ${pkg}. It will be loaded automatically.`));
+    return;
+  }
+
   console.error(pc.red(`Unknown subcommand: skills ${sub}`));
-  console.log(pc.dim("  Available: list, run <name> [params...]"));
+  console.log(pc.dim("  Available: list, search <query>, install <name>, run <name> [params...]"));
 }
 
-// ──────────────────────────────────────────────────────────────────────────
-// Connectors
-// ──────────────────────────────────────────────────────────────────────────
+async function runGateway(args: string[]): Promise<void> {
+  const portArg = args.indexOf("--port");
+  const port = portArg !== -1 ? parseInt(args[portArg + 1] ?? "3777", 10) : 3777;
+  const hostArg = args.indexOf("--host");
+  const host = hostArg !== -1 ? (args[hostArg + 1] ?? "127.0.0.1") : "127.0.0.1";
+
+  const { startGateway, loadGatewayConfig } = await import("@splash/gateway");
+  console.log(renderBanner({ subtitle: "API Gateway" }));
+  const config = { ...loadGatewayConfig(), host, port };
+  try {
+    const started = await startGateway({ config });
+    console.log(pc.green(`\n  Gateway is running on http://${started.host}:${started.port}`));
+    console.log(pc.dim(`  Endpoints:`));
+    console.log(pc.dim(`  - POST   /v1/runs`));
+    console.log(pc.dim(`  - GET    /v1/runs/:id`));
+    console.log(pc.dim(`  - GET    /v1/runs/:id/logs   (SSE)`));
+    console.log(pc.dim(`  - POST   /v1/runs/:id/stop`));
+    console.log(pc.dim(`  - POST   /v1/runs/:id/retry`));
+    console.log(pc.dim(`  - GET    /v1/health`));
+    console.log(pc.dim(`  - GET    /v1/metrics\n`));
+    console.log(pc.dim("  Press Ctrl+C to stop."));
+  } catch (e) {
+    console.error(pc.red(`[ERR] ${e instanceof Error ? e.message : String(e)}`));
+    process.exit(1);
+  }
+}
+
+
+async function runMigrate(args: string[]): Promise<void> {
+  const target = args[0];
+  if (!target || (target !== "openclaw" && target !== "hermes")) {
+    console.error(pc.red("Usage: splash migrate <openclaw|hermes>"));
+    return;
+  }
+  
+  const { runMigration } = await import("../scripts/migrate.js");
+  await runMigration(target, { dryRun: args.includes("--dry-run") });
+}
+
+async function runReplay(args: string[]): Promise<void> {
+  const { ReplayLog } = await import("@splash/core");
+  const rl = new ReplayLog();
+  const sub = args[0];
+
+  if (!sub || sub === "list") {
+    const ids = rl.list();
+    console.log(pc.cyan(pc.bold("\nRecorded Replays\n")));
+    if (ids.length === 0) {
+      console.log(pc.dim("  No replay logs found in ~/.splash/replays/"));
+    } else {
+      for (const id of ids) {
+        const a = rl.load(id);
+        const status = a?.success ? pc.green("[ok]") : pc.red("[fail]");
+        console.log(`  ${status} ${pc.bold(id)} ${pc.dim(a ? `— ${a.task.slice(0, 50)}` : "")}`);
+      }
+    }
+    console.log();
+    return;
+  }
+
+  // Treat sub as a run id to replay deterministically.
+  const result = rl.replay(sub);
+  if (!result) {
+    console.error(pc.red(`[ERR] No replay log found for "${sub}". Run: splash replay list`));
+    process.exit(1);
+  }
+  const artifact = rl.load(sub)!;
+  console.log(renderBanner({ subtitle: "Deterministic Replay" }));
+  console.log(pc.bold(`\n  Run ${sub}`));
+  console.log(`  ${pc.cyan("task:")}   ${artifact.task}`);
+  console.log(`  ${pc.cyan("status:")} ${result.success ? pc.green("succeeded") : pc.red("failed")}`);
+  console.log(`  ${pc.cyan("tokens:")} ${result.totalTokens}`);
+  console.log(pc.bold(`\n  Steps (reconstructed without provider calls):\n`));
+  for (const step of result.steps) {
+    const badge = step.success ? pc.green("ok") : pc.red("x");
+    console.log(`  [${badge}] ${pc.bold(step.id)} ${pc.dim(step.tool ? `(${step.tool})` : "")}`);
+    if (step.output) console.log(pc.dim(`       ${step.output.slice(0, 100)}`));
+    if (step.error) console.log(pc.red(`       ${step.error.slice(0, 100)}`));
+  }
+  console.log();
+}
+
+async function runStats(): Promise<void> {
+  const { ContractEvolution, ReplayLog, Reflector } = await import("@splash/core");
+  const { MemoryManager, FileMemoryStore } = await import("@splash/memory");
+  const path = await import("node:path");
+  const os = await import("node:os");
+  const fs = await import("node:fs");
+
+  console.log(renderBanner({ subtitle: "System Stats" }));
+
+  const rl = new ReplayLog();
+  const replays = rl.list();
+  const replayMeta = replays.map((id) => rl.load(id)).filter(Boolean) as Array<{ success: boolean; totalTokens: number }>;
+  const totalTokens = replayMeta.reduce((s, a) => s + (a.totalTokens || 0), 0);
+  const successRate = replayMeta.length > 0 ? replayMeta.filter((r) => r.success).length / replayMeta.length : 0;
+
+  console.log(pc.bold(`\n  Runs (${replayMeta.length} recorded)`));
+  console.log(`    ${pc.cyan("success rate:")} ${replayMeta.length ? (successRate * 100).toFixed(1) + "%" : "n/a"}`);
+  console.log(`    ${pc.cyan("total tokens:")} ${totalTokens.toLocaleString()}`);
+
+  const evo = new ContractEvolution();
+  const templates = evo.all();
+  const verified = templates.filter((t) => t.status === "verified").length;
+  const review = templates.filter((t) => t.status === "review").length;
+  console.log(pc.bold(`\n  Contract Templates (${templates.length})`));
+  console.log(`    ${pc.green("verified:")} ${verified}    ${pc.yellow("review:")} ${review}    ${pc.dim("trial:")} ${templates.length - verified - review}`);
+  for (const t of templates.slice(0, 5)) {
+    const rate = t.runs > 0 ? ((t.successes / t.runs) * 100).toFixed(0) : "0";
+    console.log(`    ${pc.dim(t.status.padEnd(8))} ${rate.padStart(3)}%  ${t.sample.slice(0, 60)}`);
+  }
+
+  try {
+    const reflector = new Reflector({});
+    const q = reflector.getQualityReport();
+    console.log(pc.bold(`\n  Reflector Insights`));
+    console.log(`    ${pc.green("high:")} ${q.high}    ${pc.cyan("medium:")} ${q.medium}    ${pc.dim("low:")} ${q.low}`);
+  } catch {
+    /* no reflections yet */
+  }
+
+  try {
+    const memDir = path.join(os.homedir(), ".splash", "memory");
+    const manager = new MemoryManager(new FileMemoryStore(memDir));
+    const trash = await manager.trashSummary();
+    console.log(pc.bold(`\n  Trash`));
+    console.log(`    ${pc.dim("total:")} ${trash.total}  ${pc.dim("unsafe:")} ${trash.unsafe}  ${pc.dim("failed:")} ${trash.failed}  ${pc.dim("noisy:")} ${trash.noisy}`);
+  } catch {
+    /* memory dir may not exist on first run */
+  }
+
+  const semCachePath = path.join(process.cwd(), ".splash", "semantic-cache.jsonl");
+  const exactCachePath = path.join(process.cwd(), ".splash", "cache.jsonl");
+  const semSize = fs.existsSync(semCachePath) ? fs.statSync(semCachePath).size : 0;
+  const exactSize = fs.existsSync(exactCachePath) ? fs.statSync(exactCachePath).size : 0;
+  console.log(pc.bold(`\n  Cache`));
+  console.log(`    ${pc.cyan("exact:")} ${(exactSize / 1024).toFixed(1)} KB    ${pc.cyan("semantic:")} ${(semSize / 1024).toFixed(1)} KB`);
+  console.log();
+}
 
 async function runConnectors(args: string[]): Promise<void> {
   const sub = args[0] || "list";
 
   if (sub === "list") {
-    const alpclaw = await buildAgent();
-    const connectors = alpclaw.connectors.list();
+    const splash = await buildAgent();
+    const connectors = splash.connectors.list();
     console.log(pc.bold(`\n  Registered Connectors\n`));
     for (const conn of connectors) {
       console.log(`  ${pc.cyan(conn.name.padEnd(15))} ${pc.dim(conn.category)}`);
@@ -1418,8 +1600,8 @@ async function runConnectors(args: string[]): Promise<void> {
       console.error(pc.red("Usage: splash connectors test <name>"));
       return;
     }
-    const alpclaw = await buildAgent();
-    const conn = alpclaw.connectors.get(name);
+    const splash = await buildAgent();
+    const conn = splash.connectors.get(name);
     if (!conn) {
       console.error(pc.red(`Connector '${name}' not found.`));
       return;
@@ -1453,7 +1635,7 @@ async function runBrowser(args: string[]): Promise<void> {
 
   let playwright;
   try {
-    // @ts-ignore
+    // @ts-ignore — optional browser dep; install with `npm i playwright`
     playwright = await import("playwright");
   } catch {
     console.error(pc.red("[ERR] Install playwright or puppeteer to use browser tools."));
@@ -1481,10 +1663,6 @@ async function runBrowser(args: string[]): Promise<void> {
     console.error(pc.red(`[ERR] Browser failed: ${e.message}`));
   }
 }
-
-// ──────────────────────────────────────────────────────────────────────────
-// Memory
-// ──────────────────────────────────────────────────────────────────────────
 
 async function runMemory(args: string[]): Promise<void> {
   const sub = args[0] || "list";
@@ -1599,7 +1777,7 @@ async function runMemory(args: string[]): Promise<void> {
 
   if (sub === "trash") {
     const trashSub = args[1];
-    const { MemoryManager, FileMemoryStore } = await import("@alpclaw/memory");
+    const { MemoryManager, FileMemoryStore } = await import("@splash/memory");
     const manager = new MemoryManager(new FileMemoryStore(memDir));
     
     if (trashSub === "list") {
@@ -1637,7 +1815,7 @@ async function runMemory(args: string[]): Promise<void> {
   }
 
   if (sub === "stats") {
-    const { MemoryManager, FileMemoryStore } = await import("@alpclaw/memory");
+    const { MemoryManager, FileMemoryStore } = await import("@splash/memory");
     const manager = new MemoryManager(new FileMemoryStore(memDir));
     const semanticRes = await manager.semantic.getAll();
     const semanticCount = semanticRes.length;
@@ -1655,10 +1833,6 @@ async function runMemory(args: string[]): Promise<void> {
   console.error(pc.red(`Unknown subcommand: memory ${sub}`));
   console.log(pc.dim("  Available: list, search <query>, export [file], import <file>, clear, trash <list|empty|restore>, stats"));
 }
-
-// ──────────────────────────────────────────────────────────────────────────
-// Maintenance
-// ──────────────────────────────────────────────────────────────────────────
 
 async function runMaintenance(args: string[]): Promise<void> {
   const apply = args.includes("--apply");
@@ -1679,7 +1853,6 @@ async function runMaintenance(args: string[]): Promise<void> {
 
   const checks: Check[] = [];
 
-  // 1. Config check
   try {
     const cfg = readGlobalConfig();
     const hasKey = Object.values(cfg.apiKeys || {}).some(Boolean);
@@ -1697,10 +1870,10 @@ async function runMaintenance(args: string[]): Promise<void> {
     checks.push({ name: "Config", status: "fail", detail: "Failed to read config. Run: splash init" });
   }
 
-  // 2. Provider health
   try {
-    const alpclaw = await AlpClaw.create();
-    const providers = alpclaw.router.listProviders();
+    const { Splash } = await import("@splash/core");
+    const splash = await Splash.create();
+    const providers = splash.router.listProviders();
     for (const prov of providers) {
       if (!prov.provider.isAvailable()) {
         checks.push({ name: `Provider: ${prov.name}`, status: "warn", detail: "not configured (no API key)" });
@@ -1725,7 +1898,6 @@ async function runMaintenance(args: string[]): Promise<void> {
     checks.push({ name: "Provider init", status: "fail", detail: msg.slice(0, 80) });
   }
 
-  // 3. Memory disk usage
   if (fs.existsSync(memDir)) {
     let totalBytes = 0;
     const walk = (dir: string) => {
@@ -1761,8 +1933,7 @@ async function runMaintenance(args: string[]): Promise<void> {
     checks.push({ name: "Memory disk", status: "ok", detail: "No memory directory yet" });
   }
 
-  // 4. Prompts check
-  const promptsDir = path.resolve(splashDir, "..", "..", "prompts"); // repo root fallback
+  const promptsDir = path.resolve(splashDir, "..", "..", "prompts");
   const localPrompts = path.resolve(process.cwd(), "prompts");
   const hasPrompts = fs.existsSync(localPrompts) && fs.readdirSync(localPrompts).some((f) => f.endsWith(".md"));
   checks.push({
@@ -1771,7 +1942,6 @@ async function runMaintenance(args: string[]): Promise<void> {
     detail: hasPrompts ? `Found in ${localPrompts}` : "No prompts/ directory in cwd",
   });
 
-  // 5. Config file exists
   const configFile = globalConfigPath();
   checks.push({
     name: "Config file",
@@ -1779,7 +1949,6 @@ async function runMaintenance(args: string[]): Promise<void> {
     detail: fs.existsSync(configFile) ? configFile : "Missing. Run: splash init",
   });
 
-  // Output
   if (json) {
     console.log(JSON.stringify({ checks, applied: apply }, null, 2));
     return;
@@ -1794,7 +1963,6 @@ async function runMaintenance(args: string[]): Promise<void> {
   const fixable = checks.filter((c) => c.fix);
   if (fixable.length > 0 && apply) {
     console.log(pc.bold("\n  Applying fixes...\n"));
-    // Write audit log
     if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
     for (const c of fixable) {
       const entry = { ts: new Date().toISOString(), action: "maintenance-fix", check: c.name, detail: c.detail };
@@ -1817,20 +1985,18 @@ async function runMaintenance(args: string[]): Promise<void> {
   console.log();
 }
 
-// ──────────────────────────────────────────────────────────────────────────
-// Bots
-// ──────────────────────────────────────────────────────────────────────────
-
-async function runBot(name: string) {
-  const spec = BOT_SPECS[name];
+async function runBot(botName: string) {
+  const spec = BOT_SPECS[botName];
   if (!spec) {
-    console.error(`Unknown platform: ${name}`);
+    console.error(`Unknown platform: ${botName}`);
     process.exit(2);
   }
 
-  // Hydrate env from global config (bots.<name>.*) so bot files can stay env-var-based.
+  console.log(renderBanner({ subtitle: `${spec.label} Bot` }));
+  const { Splash } = await import("@splash/core");
+
   const cfg = readGlobalConfig();
-  const botCreds = cfg.bots?.[name] || {};
+  const botCreds = cfg.bots?.[botName] || {};
   const env = { ...process.env };
   for (const k of spec.requiredKeys) {
     if (!env[k] && botCreds[k]) env[k] = botCreds[k];
@@ -1849,11 +2015,11 @@ async function runBot(name: string) {
     process.exit(2);
   }
 
-  const alpclawHome = process.env.SPLASH_HOME || process.env.ALPCLAW_HOME || process.cwd();
+  const splashHome = process.env.SPLASH_HOME || process.env.SPLASH_HOME || process.cwd();
   
   // Prefer the bundled JS version in dist/ if available (for production)
-  const distBotPath = path.resolve(alpclawHome, "dist", "bots", spec.file.replace(".ts", ".js"));
-  const srcBotPath = path.resolve(alpclawHome, "bots", spec.file);
+  const distBotPath = path.resolve(splashHome, "dist", "bots", spec.file.replace(".ts", ".js"));
+  const srcBotPath = path.resolve(splashHome, "bots", spec.file);
   
   let executeCmd = "";
   let executeArgs: string[] = [];
@@ -1864,8 +2030,8 @@ async function runBot(name: string) {
   } else if (fs.existsSync(srcBotPath)) {
     const tsxName = process.platform === "win32" ? "tsx.cmd" : "tsx";
     const tsxCandidates = [
-      path.resolve(alpclawHome, "node_modules", ".bin", tsxName),
-      path.resolve(alpclawHome, "..", "..", "node_modules", ".bin", tsxName),
+      path.resolve(splashHome, "node_modules", ".bin", tsxName),
+      path.resolve(splashHome, "..", "..", "node_modules", ".bin", tsxName),
       tsxName,
     ];
     executeCmd = tsxCandidates.find((p) => fs.existsSync(p)) || tsxName;
@@ -1901,7 +2067,7 @@ function loadPersona(): string | undefined {
   const localChar = path.resolve(process.cwd(), "character.md");
   const home = process.env.HOME || process.env.USERPROFILE || "";
   const splashChar = path.resolve(home, ".splash", "character.md");
-  const globalChar = path.resolve(home, ".alpclaw", "character.md");
+  const globalChar = path.resolve(home, ".splash", "character.md");
   if (fs.existsSync(localChar)) return fs.readFileSync(localChar, "utf-8");
   if (fs.existsSync(splashChar)) return fs.readFileSync(splashChar, "utf-8");
   if (fs.existsSync(globalChar)) return fs.readFileSync(globalChar, "utf-8");
@@ -1928,17 +2094,17 @@ function ensureConfigured(): void {
   }
 }
 
-async function buildAgent(): Promise<AlpClaw> {
+async function buildAgent(): Promise<Splash> {
   ensureConfigured();
   try {
-    return await AlpClaw.create();
+    return await Splash.create();
   } catch (err) {
     console.error(pc.red(`Failed to initialize Splash: ${String(err)}`));
     process.exit(1);
   }
 }
 
-function printStatusLine(a: AlpClaw): void {
+function printStatusLine(a: Splash): void {
   const pConf = a.config.providers;
   const s = a.config.safety;
   const cfg = readGlobalConfig();
@@ -1960,13 +2126,13 @@ function printStatusLine(a: AlpClaw): void {
   );
 }
 
-async function runOneShot(alpclaw: AlpClaw, description: string, persona?: string): Promise<void> {
+async function runOneShot(splash: Splash, description: string, persona?: string): Promise<void> {
   const cfg = readGlobalConfig();
   const style = cfg.cli?.style || "splash";
   
   if (style !== "silent") {
     console.log(renderBanner({ subtitle: "Agent Execution" }));
-    printStatusLine(alpclaw);
+    printStatusLine(splash);
   }
   
   let s = p.spinner();
@@ -1988,7 +2154,7 @@ async function runOneShot(alpclaw: AlpClaw, description: string, persona?: strin
 
     p.log.step(pc.bold(description));
 
-  const agent = alpclaw.createAgent({
+  const agent = splash.createAgent({
     systemPersona: persona,
     onPhaseChange: (phase: AgentPhase, _task: Task) => {
       updateSpinner(PHASE_LABELS[phase] || phase);
@@ -2077,47 +2243,51 @@ function abort(): never {
 // ──────────────────────────────────────────────────────────────────────────
 async function runPlugins(args: string[]): Promise<void> {
   const sub = args[0];
-  const pm = new PluginManager();
 
   if (!sub || sub === "list") {
-    const plugins = pm.listPlugins();
-    console.log(pc.cyan(pc.bold("Installed Plugins (MCP Servers):")));
-    if (plugins.length === 0) {
-      console.log(pc.dim("  No plugins installed."));
+    const pm = new PluginManager();
+    await pm.initialize();
+    const tools = pm.getTools();
+    console.log(pc.cyan(pc.bold("\nActive MCP Plugins & Tools\n")));
+    if (tools.length === 0) {
+      console.log(pc.dim("  No active plugins. Add one with: splash plugins add <name> <command> [args...]"));
     } else {
-      for (const plugin of plugins) {
-        const status = plugin.enabled ? pc.green("[enabled]") : pc.gray("[disabled]");
-        console.log(`  ${status} ${plugin.name} (${plugin.format}) - command: ${plugin.configPath}`);
+      for (const tool of tools) {
+        console.log(`  ${pc.cyan(tool.name.padEnd(25))} ${pc.dim((tool.description || "").slice(0, 60))}`);
       }
     }
+    pm.closeAll();
     return;
   }
 
-  if (sub === "enable") {
+  if (sub === "add") {
     const name = args[1];
-    if (!name) return failUsage("splash plugins enable <name>");
-    const res = pm.enablePlugin(name);
-    if (!res.ok) {
-      console.error(pc.red(`[ERR] ${res.error.message}`));
-      process.exit(1);
-    }
-    console.log(pc.green(`[OK] Plugin ${name} enabled.`));
+    const command = args[2];
+    if (!name || !command) return failUsage("splash plugins add <name> <command> [args...]");
+    const commandArgs = args.slice(3);
+    const cfg = readGlobalConfig();
+    if (!cfg.mcpServers) cfg.mcpServers = {};
+    cfg.mcpServers[name] = { command, args: commandArgs, env: {} };
+    writeGlobalConfig(cfg);
+    console.log(pc.green(`[OK] Added plugin ${name}. It loads automatically on the next run.`));
     return;
   }
 
-  if (sub === "disable") {
+  if (sub === "remove") {
     const name = args[1];
-    if (!name) return failUsage("splash plugins disable <name>");
-    const res = pm.disablePlugin(name);
-    if (!res.ok) {
-      console.error(pc.red(`[ERR] ${res.error.message}`));
-      process.exit(1);
+    if (!name) return failUsage("splash plugins remove <name>");
+    const cfg = readGlobalConfig();
+    if (cfg.mcpServers && cfg.mcpServers[name]) {
+      delete cfg.mcpServers[name];
+      writeGlobalConfig(cfg);
+      console.log(pc.green(`[OK] Removed plugin ${name}.`));
+    } else {
+      console.error(pc.red(`Plugin ${name} not found.`));
     }
-    console.log(pc.green(`[OK] Plugin ${name} disabled.`));
     return;
   }
 
-  failUsage("splash plugins <list|enable|disable> [name]");
+  failUsage("splash plugins <list|add|remove>");
 }
 
 main()

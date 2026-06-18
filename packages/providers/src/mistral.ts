@@ -1,5 +1,5 @@
 import { OpenAIProvider } from "./openai.js";
-import { readGlobalConfig } from "@alpclaw/config";
+import { readGlobalConfig } from "@splash/config";
 
 export class MistralProvider extends OpenAIProvider {
   constructor(apiKey?: string, baseUrl = "https://api.mistral.ai/v1") {

@@ -1,5 +1,5 @@
 import { OpenAIProvider } from "./openai.js";
-import { readGlobalConfig } from "@alpclaw/config";
+import { readGlobalConfig } from "@splash/config";
 
 export class GroqProvider extends OpenAIProvider {
   constructor(apiKey?: string, baseUrl = "https://api.groq.com/openai/v1") {
