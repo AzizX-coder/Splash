@@ -3,7 +3,7 @@ import { rm } from "node:fs/promises";
 import { FileMemoryStore } from "./file-store.js";
 import { MemoryManager } from "./manager.js";
 
-const TEST_PATH = ".alpclaw/test-memory";
+const TEST_PATH = ".splash/test-memory";
 
 describe("FileMemoryStore", () => {
   let store: FileMemoryStore;

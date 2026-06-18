@@ -1,5 +1,5 @@
-import type { Result, ConnectorAction, ToolDefinition } from "@alpclaw/utils";
-import { ok, err, createError } from "@alpclaw/utils";
+import type { Result, ConnectorAction, ToolDefinition } from "@splash/utils";
+import { ok, err, createError } from "@splash/utils";
 import type { Connector } from "./connector.js";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";

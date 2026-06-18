@@ -1,5 +1,5 @@
-import type { ConnectorAction, Result, ToolDefinition } from "@alpclaw/utils";
-import { ok, err, createError, createLogger } from "@alpclaw/utils";
+import type { ConnectorAction, Result, ToolDefinition } from "@splash/utils";
+import { ok, err, createError, createLogger } from "@splash/utils";
 import type { Connector } from "./connector.js";
 
 const log = createLogger("connector:browser");
@@ -99,7 +99,7 @@ export class BrowserConnector implements Connector {
       log.debug("browser.fetch", { url });
       const res = await fetch(url, {
         signal: controller.signal,
-        headers: { "User-Agent": "AlpClawBot/1.0 (+https://github.com/AzizX-coder/AlpClaw)" },
+        headers: { "User-Agent": "SplashBot/1.0 (+https://github.com/AzizX-coder/Splash)" },
       });
       if (!res.ok) {
         return err(createError("connector", `HTTP ${res.status} for ${url}`));

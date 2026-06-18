@@ -15,3 +15,9 @@ export { DeepseekProvider as DeepSeekProvider } from "./deepseek.js";
 export { GoogleProvider } from "./google.js";
 export { AnthropicProvider } from "./anthropic.js";
 export { ProviderRouter, type RoutingCriteria } from "./router.js";
+export {
+  RoutingPolicy,
+  DEFAULT_ROUTING_RULES,
+  type RoutingRule,
+  type RoutingTaskType,
+} from "./routing-policy.js";

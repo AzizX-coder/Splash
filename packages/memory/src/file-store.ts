@@ -10,7 +10,7 @@ import {
   err,
   createError,
   createLogger,
-} from "@alpclaw/utils";
+} from "@splash/utils";
 import type { MemoryStore } from "./store.js";
 
 const log = createLogger("memory:file");

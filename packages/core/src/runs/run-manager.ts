@@ -2,9 +2,9 @@ import { EventEmitter } from "node:events";
 import { spawn } from "node:child_process";
 import * as path from "node:path";
 import * as fs from "node:fs";
-import { generateId } from "@alpclaw/utils";
-import { AlpClaw } from "../alpclaw.js";
-import type { AgentPhase, Task } from "@alpclaw/utils";
+import { generateId } from "@splash/utils";
+import { Splash } from "../splash.js";
+import type { AgentPhase, Task } from "@splash/utils";
 import { RunStore, type RunRecord } from "./run-store.js";
 import type { RunEvent, RunStatus } from "./events.js";
 
@@ -132,8 +132,8 @@ export class RunManager extends EventEmitter {
     let toolCalls = 0;
 
     try {
-      const alpclaw = await AlpClaw.create();
-      const agent = alpclaw.createAgent({
+      const splash = await Splash.create();
+      const agent = splash.createAgent({
         onPhaseChange: (phase: AgentPhase) => {
           this.store.save({ ...(this.store.get(id) as RunRecord), phase });
           this.writeEvent({ type: "PhaseChanged", runId: id, at: now(), phase });
@@ -197,7 +197,7 @@ export class RunManager extends EventEmitter {
 
   private spawnBackground(id: string, task: string): void {
     // Find bin/splash.mjs launcher so we can re-exec ourselves with a detached child.
-    const splashHome = process.env.SPLASH_HOME || process.env.ALPCLAW_HOME || process.cwd();
+    const splashHome = process.env.SPLASH_HOME || process.env.SPLASH_HOME || process.cwd();
     const launcher = path.join(splashHome, "bin", "splash.mjs");
 
     if (!fs.existsSync(launcher)) {

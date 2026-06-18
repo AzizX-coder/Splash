@@ -1,6 +1,6 @@
-import { type Result, type SkillManifest, type SkillResult, ok, err, createError } from "@alpclaw/utils";
+import { type Result, type SkillManifest, type SkillResult, ok, err, createError } from "@splash/utils";
 import type { Skill, SkillContext } from "../skill.js";
-import { readGlobalConfig, writeGlobalConfig } from "@alpclaw/config";
+import { readGlobalConfig, writeGlobalConfig } from "@splash/config";
 
 export class ConfigEditorSkill implements Skill {
   readonly manifest: SkillManifest = {

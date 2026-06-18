@@ -6,7 +6,7 @@ import * as os from "node:os";
  * Persistent user config lives at ~/.splash/config.json so `splash` works
  * from any working directory without a local .env file.
  *
- * Legacy ~/.alpclaw/ is auto-migrated on first read.
+ * Legacy ~/.splash/ is auto-migrated on first read.
  */
 
 export interface GlobalConfigShape {
@@ -42,7 +42,7 @@ export function globalConfigDir(): string {
 }
 
 export function legacyConfigDir(): string {
-  return path.join(os.homedir(), ".alpclaw");
+  return path.join(os.homedir(), ".splash");
 }
 
 export function globalConfigPath(): string {
@@ -57,23 +57,7 @@ export function logsDir(): string {
   return path.join(globalConfigDir(), "logs");
 }
 
-function migrateFromLegacy(): void {
-  const legacy = legacyConfigDir();
-  const current = globalConfigDir();
-  if (!fs.existsSync(legacy) || fs.existsSync(current)) return;
-  try {
-    fs.mkdirSync(current, { recursive: true, mode: 0o700 });
-    const legacyCfg = path.join(legacy, "config.json");
-    if (fs.existsSync(legacyCfg)) {
-      fs.copyFileSync(legacyCfg, path.join(current, "config.json"));
-    }
-  } catch {
-    // Migration is best-effort; ignore failures.
-  }
-}
-
 export function readGlobalConfig(): GlobalConfigShape {
-  migrateFromLegacy();
   const p = globalConfigPath();
   if (!fs.existsSync(p)) return {};
   try {

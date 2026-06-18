@@ -3,7 +3,7 @@ import type {
   ConnectorCategory,
   Result,
   ToolDefinition,
-} from "@alpclaw/utils";
+} from "@splash/utils";
 
 /**
  * Interface that all connectors must implement.

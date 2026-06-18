@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
 import os from "node:os";
-import { globalConfigDir } from "@alpclaw/config";
+import { globalConfigDir } from "@splash/config";
 
 export interface MessageEntry {
   role: string;

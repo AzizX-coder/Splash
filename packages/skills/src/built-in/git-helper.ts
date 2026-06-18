@@ -1,4 +1,4 @@
-import { type Result, type SkillManifest, type SkillResult, ok, err, createError } from "@alpclaw/utils";
+import { type Result, type SkillManifest, type SkillResult, ok, err, createError } from "@splash/utils";
 import type { Skill, SkillContext } from "../skill.js";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";

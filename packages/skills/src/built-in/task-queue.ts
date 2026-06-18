@@ -1,8 +1,8 @@
-import { type Result, type SkillManifest, type SkillResult, ok, err, createError } from "@alpclaw/utils";
+import { type Result, type SkillManifest, type SkillResult, ok, err, createError } from "@splash/utils";
 import type { Skill, SkillContext } from "../skill.js";
 import fs from "node:fs";
 import path from "node:path";
-import { globalConfigDir } from "@alpclaw/config";
+import { globalConfigDir } from "@splash/config";
 
 export class TaskQueueSkill implements Skill {
   readonly manifest: SkillManifest = {

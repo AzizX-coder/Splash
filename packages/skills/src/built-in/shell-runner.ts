@@ -1,4 +1,4 @@
-import { type Result, type SkillManifest, type SkillResult, ok, err, createError } from "@alpclaw/utils";
+import { type Result, type SkillManifest, type SkillResult, ok, err, createError } from "@splash/utils";
 import type { Skill, SkillContext } from "../skill.js";
 import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
@@ -33,7 +33,7 @@ export class ShellRunnerSkill implements Skill {
     const usePowerShell = params.usePowerShell === true;
 
     const sandboxId = randomUUID();
-    const sandboxDir = path.join(os.tmpdir(), "alpclaw-sandbox", sandboxId);
+    const sandboxDir = path.join(os.tmpdir(), "splash-sandbox", sandboxId);
     
     // Determine extension based on OS and parameters
     const isWindows = os.platform() === "win32";

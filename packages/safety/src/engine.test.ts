@@ -117,3 +117,33 @@ describe("SafetyEngine", () => {
     });
   });
 });
+
+describe("SafetyEngine — credential redaction (T0.5)", () => {
+  const engine = new SafetyEngine("standard");
+
+  it("redacts an OpenAI-style key", () => {
+    const text = "here is the key sk-abcdefghijklmnopqrstuvwxyz0123456789 use it";
+    const out = engine.redactCredentials(text);
+    expect(out).not.toContain("sk-abcdefghijklmnopqrstuvwxyz0123456789");
+    expect(out).toContain("[REDACTED:openai-key]");
+  });
+
+  it("redacts a Slack token", () => {
+    const out = engine.redactCredentials("token=xoxb-1234567890-abcdef");
+    expect(out).toContain("[REDACTED:slack-token]");
+  });
+
+  it("redacts a Google API key", () => {
+    const out = engine.redactCredentials("key AIzaSyA1234567890123456789012345678901234");
+    expect(out).toContain("[REDACTED:google-key]");
+  });
+
+  it("leaves clean text untouched", () => {
+    const clean = "the build completed successfully in 500ms";
+    expect(engine.redactCredentials(clean)).toBe(clean);
+  });
+
+  it("handles empty input", () => {
+    expect(engine.redactCredentials("")).toBe("");
+  });
+});

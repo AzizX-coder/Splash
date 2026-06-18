@@ -1,5 +1,5 @@
 /**
- * AlpClaw Discord connector node.
+ * Splash Discord connector node.
  *
  * Uses Discord's Interactions HTTP endpoint — no websocket gateway library
  * required. Point your bot's Interactions Endpoint URL at:
@@ -14,7 +14,7 @@
 import * as crypto from "node:crypto";
 import * as http from "node:http";
 import pc from "picocolors";
-import { runChatTask, getAlpClaw, chunkText } from "./lib/chat-agent.js";
+import { runChatTask, getSplash, chunkText } from "./lib/chat-agent.js";
 
 const DISCORD_API = "https://discord.com/api/v10";
 const MAX_MSG = 1900;
@@ -61,7 +61,7 @@ async function sendFollowup(appId: string, token: string, text: string) {
 }
 
 async function main() {
-  console.log(pc.bgCyan(pc.black(" SYSTEM BOOT ")) + " AlpClaw Discord Connector");
+  console.log(pc.bgCyan(pc.black(" SYSTEM BOOT ")) + " Splash Discord Connector");
 
   const publicKey = process.env.DISCORD_PUBLIC_KEY;
   const botToken = process.env.DISCORD_BOT_TOKEN;
@@ -77,7 +77,7 @@ async function main() {
     process.exit(1);
   }
 
-  getAlpClaw();
+  getSplash();
   console.log(pc.green("✓ Framework initialized."));
 
   const server = http.createServer(async (req, res) => {

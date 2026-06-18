@@ -1,5 +1,5 @@
 {
-  "name": "@alpclaw/providers",
+  "name": "@splash/providers",
   "version": "0.1.2",
   "private": true,
   "type": "module",
@@ -9,8 +9,8 @@
     "clean": "node -e \"import('fs').then(fs=>fs.rmSync('dist',{recursive:true,force:true}))\""
   },
   "dependencies": {
-    "@alpclaw/utils": "workspace:*",
-    "@alpclaw/config": "workspace:*",
+    "@splash/utils": "workspace:*",
+    "@splash/config": "workspace:*",
     "zod": "^3.23.0"
   }
 }

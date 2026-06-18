@@ -1,6 +1,6 @@
 {
   "name": "splash-agent",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "description": "Splash — Autonomous Agent Platform: CLI + multi-provider agent loop + TUI dashboard + platform bots",
   "author": "Splash Contributors",
   "license": "MIT",
@@ -34,8 +34,7 @@
     "node": ">=20.0.0"
   },
   "bin": {
-    "splash": "./bin/splash.mjs",
-    "alpclaw": "./bin/alpclaw.mjs"
+    "splash": "./bin/splash.mjs"
   },
   "files": [
     "bin/",

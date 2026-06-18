@@ -5,10 +5,10 @@ import type {
   Message,
   ToolCall,
   ToolDefinition,
-} from "@alpclaw/utils";
-import { ok, err, createError, createLogger } from "@alpclaw/utils";
+} from "@splash/utils";
+import { ok, err, createError, createLogger } from "@splash/utils";
 import type { ModelProvider, ProviderCapabilities } from "./provider.js";
-import { readGlobalConfig } from "@alpclaw/config";
+import { readGlobalConfig } from "@splash/config";
 
 const log = createLogger("provider:openai");
 
@@ -103,6 +103,7 @@ export class OpenAIProvider implements ModelProvider {
         return err(
           createError("provider", `${this.name} API error ${response.status}: ${errorText}`, {
             retryable: response.status >= 500 || response.status === 429,
+            statusCode: response.status,
           }),
         );
       }

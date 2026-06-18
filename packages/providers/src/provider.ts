@@ -3,7 +3,7 @@ import type {
   CompletionResponse,
   ProviderName,
   Result,
-} from "@alpclaw/utils";
+} from "@splash/utils";
 
 /**
  * Interface that all model providers must implement.

@@ -1,8 +1,8 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { ConnectorAction, Result, ToolDefinition } from "@alpclaw/utils";
-import { ok, err, createError, createLogger } from "@alpclaw/utils";
-import { validateNoInjection } from "@alpclaw/safety";
+import type { ConnectorAction, Result, ToolDefinition } from "@splash/utils";
+import { ok, err, createError, createLogger } from "@splash/utils";
+import { validateNoInjection } from "@splash/safety";
 import type { Connector } from "./connector.js";
 
 const execFileAsync = promisify(execFile);

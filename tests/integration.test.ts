@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { SafetyEngine } from "@alpclaw/safety";
-import { FileMemoryStore, MemoryManager } from "@alpclaw/memory";
+import { SafetyEngine } from "@splash/safety";
+import { FileMemoryStore, MemoryManager } from "@splash/memory";
 import {
   ConnectorRegistry,
   FilesystemConnector,
   TerminalConnector,
-} from "@alpclaw/connectors";
+} from "@splash/connectors";
 import {
   SkillRegistry,
   RepoAnalysisSkill,
@@ -18,11 +18,11 @@ import {
   MessageDrafterSkill,
   DeployerSkill,
   ApiIntegratorSkill,
-} from "@alpclaw/skills";
-import { ProviderRouter } from "@alpclaw/providers";
-import { loadConfig } from "@alpclaw/config";
-import type { CompletionResponse, Result } from "@alpclaw/utils";
-import { ok } from "@alpclaw/utils";
+} from "@splash/skills";
+import { ProviderRouter } from "@splash/providers";
+import { loadConfig } from "@splash/config";
+import type { CompletionResponse, Result } from "@splash/utils";
+import { ok } from "@splash/utils";
 
 /**
  * Integration tests that verify all packages work together.
@@ -107,7 +107,7 @@ describe("Integration: Full system wiring", () => {
     expect(safety.getMode()).toBe("standard");
 
     // Memory
-    const memStore = new FileMemoryStore(".alpclaw/test-integration");
+    const memStore = new FileMemoryStore(".splash/test-integration");
     const memory = new MemoryManager(memStore);
     expect(memory).toBeDefined();
   });
@@ -186,7 +186,7 @@ describe("Integration: Full system wiring", () => {
   });
 
   it("memory stores and retrieves entries end to end", async () => {
-    const store = new FileMemoryStore(".alpclaw/test-e2e-memory");
+    const store = new FileMemoryStore(".splash/test-e2e-memory");
     const memory = new MemoryManager(store);
 
     await memory.remember("project", "language", "TypeScript");

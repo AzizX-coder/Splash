@@ -8,9 +8,9 @@ import * as os from "node:os";
 import * as fs from "node:fs";
 
 // Use a temporary test directory instead of the real config dir
-const TEST_DIR = path.join(os.tmpdir(), "alpclaw-memory-test-" + Date.now());
+const TEST_DIR = path.join(os.tmpdir(), "splash-memory-test-" + Date.now());
 
-vi.mock("@alpclaw/config", () => ({
+vi.mock("@splash/config", () => ({
   globalConfigDir: () => TEST_DIR
 }));
 

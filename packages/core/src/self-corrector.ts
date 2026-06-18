@@ -1,6 +1,6 @@
-import type { Message, Result, AlpClawError } from "@alpclaw/utils";
-import { ok, err, createError, createLogger } from "@alpclaw/utils";
-import type { ProviderRouter } from "@alpclaw/providers";
+import type { Message, Result, SplashError } from "@splash/utils";
+import { ok, err, createError, createLogger } from "@splash/utils";
+import type { ProviderRouter } from "@splash/providers";
 import type { VerificationResult } from "./verifier.js";
 
 const log = createLogger("core:corrector");
@@ -26,7 +26,7 @@ export class SelfCorrector {
     originalParams: Record<string, unknown>,
     verification: VerificationResult,
     previousAttempts: number,
-    error?: AlpClawError,
+    error?: SplashError,
   ): Promise<Result<CorrectionStrategy>> {
     // Simple heuristic corrections first (no LLM needed)
     const quickFix = this.tryQuickFix(originalAction, verification, previousAttempts, error);
@@ -51,7 +51,7 @@ export class SelfCorrector {
     action: string,
     verification: VerificationResult,
     attempts: number,
-    error?: AlpClawError,
+    error?: SplashError,
   ): CorrectionStrategy | null {
     // Retryable errors on first attempt → just retry
     if (error?.retryable && attempts === 0) {
@@ -77,7 +77,7 @@ export class SelfCorrector {
     originalAction: string,
     originalParams: Record<string, unknown>,
     verification: VerificationResult,
-    error?: AlpClawError,
+    error?: SplashError,
   ): Promise<Result<CorrectionStrategy>> {
     const prompt = `You are a self-correction module for an autonomous agent.
 

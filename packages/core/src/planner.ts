@@ -1,7 +1,7 @@
-import type { Message, Result } from "@alpclaw/utils";
-import { ok, err, createError, createLogger } from "@alpclaw/utils";
-import type { ProviderRouter } from "@alpclaw/providers";
-import type { SkillManifest, ToolDefinition } from "@alpclaw/utils";
+import type { Message, Result } from "@splash/utils";
+import { ok, err, createError, createLogger } from "@splash/utils";
+import type { ProviderRouter } from "@splash/providers";
+import type { SkillManifest, ToolDefinition } from "@splash/utils";
 
 const log = createLogger("core:planner");
 

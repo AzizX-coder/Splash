@@ -1,5 +1,5 @@
 /**
- * Structured logger for AlpClaw.
+ * Structured logger for Splash.
  * Simple, no external deps, supports log levels and structured data.
  */
 
@@ -92,7 +92,7 @@ let rootLogger: Logger | undefined;
 
 export function getRootLogger(): Logger {
   if (!rootLogger) {
-    const envLevel = (process.env["SPLASH_LOG_LEVEL"] || process.env["ALPCLAW_LOG_LEVEL"] || "warn") as LogLevel;
+    const envLevel = (process.env["SPLASH_LOG_LEVEL"] || process.env["SPLASH_LOG_LEVEL"] || "warn") as LogLevel;
     rootLogger = new Logger("splash", envLevel);
   }
   return rootLogger;

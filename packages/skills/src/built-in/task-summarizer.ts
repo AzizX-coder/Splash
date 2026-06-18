@@ -1,5 +1,5 @@
-import type { SkillManifest, SkillResult, Result } from "@alpclaw/utils";
-import { ok, err, createError } from "@alpclaw/utils";
+import type { SkillManifest, SkillResult, Result } from "@splash/utils";
+import { ok, err, createError } from "@splash/utils";
 import type { Skill, SkillContext } from "../skill.js";
 
 export class TaskSummarizerSkill implements Skill {

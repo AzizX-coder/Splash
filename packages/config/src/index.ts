@@ -1,5 +1,5 @@
-export { ConfigSchema, type AlpClawConfig } from "./schema.js";
-export { loadConfig, type AlpClawConfigOverrides } from "./loader.js";
+export { ConfigSchema, type SplashConfig } from "./schema.js";
+export { loadConfig, type SplashConfigOverrides } from "./loader.js";
 export {
   readGlobalConfig,
   writeGlobalConfig,

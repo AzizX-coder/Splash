@@ -1,5 +1,5 @@
 import { OpenAIProvider } from "./openai.js";
-import { readGlobalConfig } from "@alpclaw/config";
+import { readGlobalConfig } from "@splash/config";
 
 export class NvidiaProvider extends OpenAIProvider {
   constructor(apiKey?: string, baseUrl = "https://integrate.api.nvidia.com/v1") {

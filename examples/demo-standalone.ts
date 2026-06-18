@@ -1,21 +1,21 @@
 #!/usr/bin/env tsx
 
 /**
- * AlpClaw standalone demo — shows how to use individual packages
+ * Splash standalone demo — shows how to use individual packages
  * without the full agent loop. Useful for understanding the architecture.
  */
 
-import { SafetyEngine } from "@alpclaw/safety";
-import { FileMemoryStore, MemoryManager } from "@alpclaw/memory";
-import { ConnectorRegistry, FilesystemConnector, TerminalConnector } from "@alpclaw/connectors";
-import { SkillRegistry, RepoAnalysisSkill, CodeEditSkill } from "@alpclaw/skills";
-import { ProviderRouter, ClaudeProvider, OpenAIProvider } from "@alpclaw/providers";
-import { createLogger } from "@alpclaw/utils";
+import { SafetyEngine } from "@splash/safety";
+import { FileMemoryStore, MemoryManager } from "@splash/memory";
+import { ConnectorRegistry, FilesystemConnector, TerminalConnector } from "@splash/connectors";
+import { SkillRegistry, RepoAnalysisSkill, CodeEditSkill } from "@splash/skills";
+import { ProviderRouter, ClaudeProvider, OpenAIProvider } from "@splash/providers";
+import { createLogger } from "@splash/utils";
 
 const log = createLogger("demo");
 
 async function main() {
-  console.log("=== AlpClaw Standalone Demo ===\n");
+  console.log("=== Splash Standalone Demo ===\n");
 
   // ── 1. Safety Engine ────────────────────────────────────────────────────
   console.log("--- Safety Engine ---");
@@ -38,7 +38,7 @@ async function main() {
 
   // ── 2. Memory System ───────────────────────────────────────────────────
   console.log("\n--- Memory System ---");
-  const memStore = new FileMemoryStore(".alpclaw/demo-memory");
+  const memStore = new FileMemoryStore(".splash/demo-memory");
   const memory = new MemoryManager(memStore);
 
   await memory.remember("project", "tech-stack", "TypeScript + pnpm monorepo");

@@ -1,5 +1,5 @@
-import type { SkillManifest } from "@alpclaw/utils";
-import { createLogger } from "@alpclaw/utils";
+import type { SkillManifest } from "@splash/utils";
+import { createLogger } from "@splash/utils";
 import type { Skill } from "./skill.js";
 
 const log = createLogger("skills:registry");

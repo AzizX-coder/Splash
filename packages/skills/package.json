@@ -1,5 +1,5 @@
 {
-  "name": "@alpclaw/skills",
+  "name": "@splash/skills",
   "version": "0.1.2",
   "private": true,
   "type": "module",
@@ -9,9 +9,9 @@
     "clean": "node -e \"import('fs').then(fs=>fs.rmSync('dist',{recursive:true,force:true}))\""
   },
   "dependencies": {
-    "@alpclaw/connectors": "workspace:*",
-    "@alpclaw/providers": "workspace:*",
-    "@alpclaw/utils": "workspace:*",
+    "@splash/connectors": "workspace:*",
+    "@splash/providers": "workspace:*",
+    "@splash/utils": "workspace:*",
     "@mozilla/readability": "^0.6.0",
     "jsdom": "^29.1.1",
     "pdf-parse": "^2.4.5",

@@ -1,4 +1,4 @@
-import { type Result, type SkillManifest, type SkillResult, ok, err, createError } from "@alpclaw/utils";
+import { type Result, type SkillManifest, type SkillResult, ok, err, createError } from "@splash/utils";
 import type { Skill, SkillContext } from "../skill.js";
 import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
@@ -34,7 +34,7 @@ export class PythonRunnerSkill implements Skill {
     const requirements = (params.requirements || []) as string[];
 
     const sandboxId = randomUUID();
-    const sandboxDir = path.join(os.tmpdir(), "alpclaw-sandbox", sandboxId);
+    const sandboxDir = path.join(os.tmpdir(), "splash-sandbox", sandboxId);
     
     try {
       await fs.mkdir(sandboxDir, { recursive: true });

@@ -1,5 +1,5 @@
 /**
- * AlpClaw Facebook Messenger connector node.
+ * Splash Facebook Messenger connector node.
  *
  * Configure your Messenger app's webhook with:
  *   Callback URL: https://<your-host>/messenger/webhook
@@ -13,7 +13,7 @@
 
 import * as http from "node:http";
 import pc from "picocolors";
-import { runChatTask, getAlpClaw, chunkText } from "./lib/chat-agent.js";
+import { runChatTask, getSplash, chunkText } from "./lib/chat-agent.js";
 
 const GRAPH = "https://graph.facebook.com/v19.0";
 const MAX_MSG = 1900; // Messenger hard limit is 2000
@@ -52,7 +52,7 @@ function readBody(req: http.IncomingMessage): Promise<string> {
 }
 
 async function main() {
-  console.log(pc.bgCyan(pc.black(" SYSTEM BOOT ")) + " AlpClaw Messenger Connector");
+  console.log(pc.bgCyan(pc.black(" SYSTEM BOOT ")) + " Splash Messenger Connector");
 
   const verifyToken = process.env.MESSENGER_VERIFY_TOKEN;
   const pageToken = process.env.MESSENGER_PAGE_TOKEN;
@@ -63,7 +63,7 @@ async function main() {
     process.exit(1);
   }
 
-  getAlpClaw();
+  getSplash();
   console.log(pc.green("✓ Framework initialized."));
 
   const seen = new Set<string>();

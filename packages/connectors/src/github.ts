@@ -1,5 +1,5 @@
-import type { ConnectorAction, Result, ToolDefinition } from "@alpclaw/utils";
-import { ok, err, createError, createLogger } from "@alpclaw/utils";
+import type { ConnectorAction, Result, ToolDefinition } from "@splash/utils";
+import { ok, err, createError, createLogger } from "@splash/utils";
 import type { Connector } from "./connector.js";
 
 const log = createLogger("connector:github");

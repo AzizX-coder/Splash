@@ -17,15 +17,19 @@
     "exactOptionalPropertyTypes": false,
     "isolatedModules": true,
     "paths": {
-      "@alpclaw/utils":      ["./packages/utils/src/index.ts"],
-      "@alpclaw/config":     ["./packages/config/src/index.ts"],
-      "@alpclaw/safety":     ["./packages/safety/src/index.ts"],
-      "@alpclaw/memory":     ["./packages/memory/src/index.ts"],
-      "@alpclaw/providers":  ["./packages/providers/src/index.ts"],
-      "@alpclaw/connectors": ["./packages/connectors/src/index.ts"],
-      "@alpclaw/skills":     ["./packages/skills/src/index.ts"],
-      "@alpclaw/tools":      ["./packages/tools/src/index.ts"],
-      "@alpclaw/core":       ["./packages/core/src/index.ts"]
+      "@splash/utils":      ["./packages/utils/src/index.ts"],
+      "@splash/config":     ["./packages/config/src/index.ts"],
+      "@splash/safety":     ["./packages/safety/src/index.ts"],
+      "@splash/memory":     ["./packages/memory/src/index.ts"],
+      "@splash/providers":  ["./packages/providers/src/index.ts"],
+      "@splash/connectors": ["./packages/connectors/src/index.ts"],
+      "@splash/skills":     ["./packages/skills/src/index.ts"],
+      "@splash/tools":      ["./packages/tools/src/index.ts"],
+      "@splash/core":       ["./packages/core/src/index.ts"],
+      "@splash/gateway":    ["./packages/gateway/src/index.ts"],
+      "@splash/plugins":    ["./packages/plugins/src/index.ts"],
+      "@splash/mcp":        ["./packages/mcp/src/index.ts"],
+      "@splash/migrate":    ["./packages/migrate/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "dist", "coverage"]

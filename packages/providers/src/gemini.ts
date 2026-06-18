@@ -5,8 +5,8 @@ import type {
   Message,
   ToolCall,
   ToolDefinition,
-} from "@alpclaw/utils";
-import { ok, err, createError, createLogger } from "@alpclaw/utils";
+} from "@splash/utils";
+import { ok, err, createError, createLogger } from "@splash/utils";
 import type { ModelProvider, ProviderCapabilities } from "./provider.js";
 
 const log = createLogger("provider:gemini");

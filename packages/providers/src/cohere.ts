@@ -1,7 +1,7 @@
-import type { CompletionRequest, CompletionResponse, Result, Message } from "@alpclaw/utils";
-import { err, ok, createError, createLogger } from "@alpclaw/utils";
+import type { CompletionRequest, CompletionResponse, Result, Message } from "@splash/utils";
+import { err, ok, createError, createLogger } from "@splash/utils";
 import type { ModelProvider, ProviderCapabilities } from "./provider.js";
-import { readGlobalConfig } from "@alpclaw/config";
+import { readGlobalConfig } from "@splash/config";
 
 const log = createLogger("provider:cohere");
 
